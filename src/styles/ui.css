@@ -37,17 +37,18 @@
   color: var(--paper);
 }
 
-#ui :where(button, input, select) {
+/* Resets are wrapped in :where() so they never outrank a component class. */
+:where(#ui) :where(button, input, select) {
   font: inherit;
   color: inherit;
 }
 
-#ui :where(h1, h2, h3, p, ul) {
+:where(#ui) :where(h1, h2, h3, p, ul) {
   margin: 0;
   padding: 0;
 }
 
-#ui :where(ul) {
+:where(#ui) :where(ul) {
   list-style: none;
 }
 
@@ -155,6 +156,8 @@
 
 .figure .hand-glyph {
   width: auto;
+  height: 100%;
+  aspect-ratio: 2.1 / 2.35;
 }
 
 .figure--swipe .hand-glyph {
@@ -443,6 +446,8 @@
 .tabs {
   display: flex;
   gap: 2px;
+  max-width: 100%;
+  overflow-x: auto;
 }
 
 .tab {
@@ -452,6 +457,7 @@
   border-bottom: 2px solid transparent;
   background: none;
   font-weight: 600;
+  white-space: nowrap;
   color: var(--muted);
 }
 

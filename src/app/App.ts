@@ -151,6 +151,8 @@ export class App {
   };
 
   private onSessionStatus(status: SessionStatus): void {
+    // Starting the camera and compiling the hand model stalls the page for a moment.
+    if (status.state !== 'off') this.engine.pauseQualityAdaptation(6000);
     switch (status.state) {
       case 'camera-failed':
         clearGestureState();

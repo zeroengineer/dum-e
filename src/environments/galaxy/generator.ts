@@ -109,10 +109,13 @@ export function generateGalaxy(input: GalaxyConfig, seed = 42): GalaxyBuffers {
     let kind: number = STAR_KIND.PATTERN;
 
     if (u < bulgeShare) {
-      radius = coreSize * Math.cbrt(rng());
+      // A slightly flattened ball, denser toward the centre.
+      const distance = coreSize * Math.pow(rng(), 0.6);
+      const up = rng() * 2 - 1;
+      radius = distance * Math.sqrt(1 - up * up);
       angle = rng() * TAU;
-      height = gaussish(rng) * coreSize * 0.6 * (1 - (radius / coreSize) * 0.5);
-      temperature = (radius / coreSize) * 0.22;
+      height = distance * up * 0.65;
+      temperature = (distance / coreSize) * 0.22;
       kind = STAR_KIND.FREE;
     } else if (u < bulgeShare + barShare) {
       // An elongated bar through the centre, locked to the arm pattern.

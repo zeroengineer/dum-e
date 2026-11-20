@@ -48,7 +48,9 @@ void main() {
   // Scattered bright nebula-coloured stars along the arms.
   float accent = step(0.93, aSeed.w) * (1.0 - kind) * step(0.4, aSeed.y);
   color = mix(color, uAccentColor, accent * 0.85);
-  vColor = color * (0.6 + 0.8 * aSeed.x);
+  // The bulge packs many stars into few pixels; dim them so additive blending does not clip to white.
+  float crowding = mix(0.28, 1.0, smoothstep(0.0, 0.4, aSeed.y));
+  vColor = color * (0.6 + 0.8 * aSeed.x) * crowding;
   vAlpha = reveal;
 }
 `;
