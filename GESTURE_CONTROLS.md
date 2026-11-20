@@ -1,69 +1,126 @@
 # Gesture controls
 
-The preview in the corner is mirrored: move your hand right and it moves right on screen. The HUD
-shows which gesture is being recognised for each hand in real time.
+The camera preview in the corner is mirrored: move your hand right and it moves right on screen.
+The large readout at the bottom of the screen names the gesture being recognised, and the Gestures
+panel highlights the matching row.
 
 ## The gestures
 
-| Gesture     | How to make it                                    | How it is detected                                              |
-| ----------- | ------------------------------------------------- | --------------------------------------------------------------- |
-| Open palm   | All fingers straight, hand open toward the camera | Four fingers extended (reach ratio), thumb away from the palm   |
-| Closed fist | Curl all fingers into the palm                    | Four fingertips folded back toward the wrist                    |
-| Pinch       | Touch thumb tip and index fingertip               | Thumb–index tip distance relative to palm size, with hysteresis |
-| Point       | Index finger straight, other fingers curled       | Index extended while middle, ring and little fingers are folded |
-| Swipe       | Move the hand quickly left, right, up or down     | Palm travel and speed over a ~300 ms window, one dominant axis  |
-| Two hands   | Show both hands, move them apart or together      | Change in distance between the two palm centres                 |
-| Move        | Just move a hand                                  | Palm centre position, smoothed                                  |
+| Gesture   | How to make it                                    | How it is detected                                                             |
+| --------- | ------------------------------------------------- | ------------------------------------------------------------------------------ |
+| Move      | Move a hand in view                               | Palm centre position, smoothed                                                 |
+| Open palm | All five fingers straight, palm toward the camera | Four fingers straight (knuckle-to-tip distance over bone length), not pinching |
+| Fist      | Curl all fingers into the palm                    | Four fingers folded with their tips close to the palm centre                   |
+| Pinch     | Touch thumb tip to index fingertip                | Thumb–index tip distance relative to palm length, index finger not folded      |
+| Point     | Index finger straight, other fingers curled       | Index straight while middle, ring and little fingers are folded                |
+| Swipe     | Flick an open hand left, right, up or down        | Palm travel, speed and straightness over the last ~0.3 s                       |
+| Two hands | Show both hands, move them apart or together      | Change in distance between the two palm centres                                |
 
-Poses need to be held for a moment (about a tenth of a second) before they register, and they
-survive brief tracking drop-outs. A swipe cannot fire again for about 0.7 s.
+How recognition behaves:
+
+- A pose must hold for about a tenth of a second before it registers, and only one pose is active
+  per hand at a time.
+- A gesture releases at a lower confidence than it starts at, so it does not flicker at the edge.
+- Gestures survive a tracking drop-out of up to 0.3 s.
+- A swipe cannot fire again for 0.75 s, is ignored for the first 0.35 s after a hand appears, and
+  never fires while that hand is pinching, pointing or making a fist.
+- Two-hand distance changes under about 1% are ignored as jitter.
+- Settings → Gesture sensitivity makes all of this stricter or more eager.
+
+All measurements are relative to the size of your palm, so distance from the camera does not matter.
+
+## Mouse and keyboard
+
+The mouse is a virtual right hand and produces the same gestures. It works over the 3D scene, not
+over the panels.
+
+| Input                              | Gesture                 |
+| ---------------------------------- | ----------------------- |
+| Move the mouse                     | Move                    |
+| Hold the left button (drag)        | Pinch                   |
+| Hold the right button, or hold `F` | Fist                    |
+| Hold `O`                           | Open palm               |
+| Hold `P`                           | Point                   |
+| Mouse wheel                        | Two hands (up = apart)  |
+| `Shift` + wheel while dragging     | Wrist roll              |
+| Arrow keys                         | Swipe in that direction |
+
+This can be switched off in Settings → Mouse and keyboard control.
 
 ## Particle Universe
 
-| Gesture            | Effect                                         | Mouse / keyboard             |
-| ------------------ | ---------------------------------------------- | ---------------------------- |
-| Move hand          | Particles ripple away from your hand           | Move the mouse               |
-| Open palm          | Expand the formation and push particles away   | Hold `Space`                 |
-| Closed fist        | Pull particles toward your hand                | Hold right button or `Shift` |
-| Pinch and drag     | Grab the nearby group of particles and drag it | Left-button drag             |
-| Two hands apart    | Expand the formation                           | Wheel up                     |
-| Two hands together | Compress the formation                         | Wheel down                   |
-| Swipe left / right | Previous / next formation                      | `←` / `→`                    |
+| Gesture             | Effect                                                                    |
+| ------------------- | ------------------------------------------------------------------------- |
+| Move                | Particles near your hand are gently pushed aside                          |
+| Open palm           | Push particles away and expand the whole cloud                            |
+| Fist                | Pull particles toward your hand and tighten the cloud                     |
+| Pinch and move      | Grab the clump under your fingers and drag it; it springs back on release |
+| Two hands apart     | Expand the formation                                                      |
+| Two hands together  | Compress the formation                                                    |
+| Swipe left or up    | Next formation                                                            |
+| Swipe right or down | Previous formation                                                        |
+
+Formations: sphere, galaxy, heart, DNA, spiral, wave, explosion. The Controls panel sets formation,
+particle count, speed, size, spread and colour.
 
 ## Object Manipulation Lab
 
-| Gesture             | Effect                                | Mouse / keyboard         |
-| ------------------- | ------------------------------------- | ------------------------ |
-| Point               | Select the object you point at        | Hover                    |
-| Pinch               | Grab the selected (or nearest) object | Left-button press        |
-| Move while pinching | Move the object                       | Drag                     |
-| Rotate wrist        | Rotate the grabbed object             | `Q` / `E` while dragging |
-| Two hands           | Scale the selected object             | Wheel                    |
-| Open palm           | Release and deselect                  | `Space`                  |
-| Closed fist         | Shockwave from the selected object    | Right button or `Shift`  |
+| Gesture                       | Effect                                                                  |
+| ----------------------------- | ----------------------------------------------------------------------- |
+| Move                          | A ring follows your hand; the object under it is highlighted            |
+| Point                         | Select the object you point at (cyan outline)                           |
+| Pinch                         | Grab the object under your fingers, or the selected one (amber outline) |
+| Move while pinching           | Carry the object                                                        |
+| Turn the wrist while pinching | Rotate the object about the line of sight                               |
+| Two hands                     | Scale the held or selected object                                       |
+| Open palm                     | Let go; with nothing held, clear the selection                          |
+| Fist                          | Shockwave: objects are thrown outward and settle back                   |
 
-Selection needs the pointer to rest on an object briefly, which prevents objects being picked up
-by a hand that is just passing through. Wrist rotation is only applied when the hand is tracked
-confidently and the change between frames is plausible.
+Each hand can hold its own object. A pinch that just misses still picks the nearest object within a
+small margin. Swipe does nothing here on purpose, so carrying an object quickly cannot change the
+selection; use the Select next button instead. Scaling needs a held or selected object, so with
+the mouse, click an object before using the wheel.
 
 ## Galaxy Explorer
 
-| Gesture            | Effect                               | Mouse / keyboard             |
-| ------------------ | ------------------------------------ | ---------------------------- |
-| Move hand          | Rotate the galaxy                    | Move the mouse               |
-| Open palm          | Expand the galaxy                    | Hold `Space`                 |
-| Closed fist        | Contract the galaxy                  | Hold right button or `Shift` |
-| Two hands apart    | Zoom in                              | Wheel up                     |
-| Two hands together | Zoom out                             | Wheel down                   |
-| Swipe              | Next / previous galaxy configuration | `←` / `→`                    |
+| Gesture             | Effect                            |
+| ------------------- | --------------------------------- |
+| Move                | Turn the galaxy, as if holding it |
+| Open palm           | Expand the galaxy                 |
+| Fist                | Contract the galaxy               |
+| Two hands apart     | Zoom in                           |
+| Two hands together  | Zoom out                          |
+| Swipe left or up    | Next configuration                |
+| Swipe right or down | Previous configuration            |
 
-Every galaxy parameter is also available as a slider or button in the control panel.
+With the mouse the galaxy turns only while you drag, so crossing the screen to reach a slider does
+not spin it. Every parameter (stars, arms, twist, core, spread, thickness, bar, speed, colours,
+zoom) is also a slider or button in the Controls panel.
 
 ## Global keys
 
-| Key         | Action                        |
-| ----------- | ----------------------------- |
-| `1` `2` `3` | Switch environment            |
-| `R`         | Reset the current environment |
-| `T`         | Toggle hand tracking          |
-| `Esc`       | Close the open panel          |
+| Key         | Action                              |
+| ----------- | ----------------------------------- |
+| `1` `2` `3` | Switch world                        |
+| `R`         | Reset the current world             |
+| `T`         | Turn the camera on or off           |
+| `Esc`       | Close Settings or skip the tutorial |
+
+## Checking with a real hand
+
+Automated tests cannot put a hand in front of the camera, so these need a person. In good light,
+40–80 cm from the camera:
+
+1. Start experience, allow the camera. The preview appears with dots on your hand; the status reads
+   Tracking and names the hand in view.
+2. Hold up your right hand. The status should say Right hand. If it says Left, set
+   `swapHandedness: true` in `src/vision/landmarks/LandmarkProcessor.ts`.
+3. Make each pose in turn (open palm, fist, pinch, point). The readout should name it within a
+   moment and drop it when you relax.
+4. Flick an open hand sideways once: one Swipe, not two.
+5. Show both hands and move them apart: Two hands appears and the scene zooms or scales smoothly.
+6. Cover the camera for a moment mid-pinch: the pinch should survive a blink and end after a longer loss.
+7. In each world, try every row of its table above.
+
+If poses are missed or trigger too easily, adjust Gesture sensitivity first. The thresholds
+themselves live in `src/gestures/recognizers/`.
