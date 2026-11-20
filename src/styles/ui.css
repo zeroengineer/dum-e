@@ -806,26 +806,49 @@
 }
 
 .tutorial {
+  /* A compact card along the bottom edge: the scene above it must stay visible and reachable. */
   position: absolute;
-  inset: auto 0 clamp(5rem, 16vh, 9rem);
-  width: min(27rem, calc(100vw - 24px));
+  inset: auto 0 12px;
+  width: min(34rem, calc(100vw - 24px));
   margin-inline: auto;
   box-shadow: 0 24px 80px rgb(4 6 12 / 0.7);
 }
 
 .tutorial__body {
   display: grid;
-  gap: 0.6rem;
-  padding: 1.1rem 1.25rem 1.25rem;
-  text-align: center;
+  grid-template-columns: 7.5rem minmax(0, 1fr);
+  grid-template-areas:
+    'figure progress'
+    'figure title'
+    'figure how'
+    'figure state'
+    'actions actions';
+  align-items: start;
+  gap: 0.2rem 1.1rem;
+  padding: 1rem 1.1rem;
+}
+
+.tutorial .figure {
+  grid-area: figure;
+  height: 8.5rem;
 }
 
 .tutorial__progress {
+  grid-area: progress;
   font-size: var(--step--1);
   color: var(--muted);
 }
 
+.tutorial__title {
+  grid-area: title;
+}
+
+.tutorial__how {
+  grid-area: how;
+}
+
 .tutorial__state {
+  grid-area: state;
   font-size: var(--step--1);
   color: var(--muted);
 }
@@ -836,16 +859,17 @@
 }
 
 .tutorial__actions {
+  grid-area: actions;
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
+  justify-content: flex-end;
   gap: 0.5rem;
-  margin-top: 0.5rem;
+  margin-top: 0.6rem;
 }
 
-.tutorial__actions .btn--primary {
-  font-size: var(--step-0);
-  padding: 0.6em 1.4em;
+.tutorial__actions .btn {
+  font-size: var(--step--1);
+  padding: 0.5em 1em;
 }
 
 /* --- small screens ------------------------------------------------------------------------ */
