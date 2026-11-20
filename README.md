@@ -13,6 +13,18 @@ the video is never recorded or uploaded.
 
 Mouse and keyboard work everywhere as a fallback, so the app is usable without a camera.
 
+## Using it
+
+1. **Start experience** asks for the camera and takes you to the world list. **Continue with mouse
+   only** skips the camera.
+2. Pick a world. The first time, a short tutorial teaches each gesture and moves on when it sees
+   you make it.
+3. In a world: the top bar switches worlds and shows tracking status; Gestures lists what each
+   gesture does there; Controls has a slider or button for everything; the corner shows the
+   camera with your tracked hand drawn on it.
+
+`?env=particles`, `?env=objects` or `?env=galaxy` in the URL opens a world directly.
+
 ## Quick start
 
 ```bash
@@ -45,6 +57,10 @@ Edge, Firefox or Safari), and a webcam for gesture control. Camera access needs 
   give the steadiest tracking.
 - If permission is denied the app explains how to re-enable it, offers Retry, and stays usable
   with mouse and keyboard.
+- The camera stream is stopped when you turn the camera off and when you leave the page.
+
+The hand model and MediaPipe runtime are served by the app itself. The two interface typefaces
+load from Google Fonts; offline, the interface falls back to system fonts.
 
 ## Documentation
 

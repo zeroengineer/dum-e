@@ -51,6 +51,9 @@ export function mountUi(app: App, root: HTMLElement): () => void {
       app.openEnvironment(ENVIRONMENTS[index].id);
     } else if (event.key.toLowerCase() === 'r') {
       app.resetEnvironment();
+    } else if (event.key.toLowerCase() === 't') {
+      if (state.tracking.status === 'off') void app.enableTracking();
+      else app.disableTracking();
     }
   };
   window.addEventListener('keydown', onKeyDown);

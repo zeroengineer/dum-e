@@ -17,15 +17,16 @@ model download fails (offline install), the app loads the model from Google's CD
 ```
 src/
   core/          engine loop, renderer, scene management, camera rig, resource tracking
-  vision/        webcam, MediaPipe wrapper, landmark processing, tracking service
-  gestures/      recognisers, state machine, smoothing filters, event types
-  interaction/   gesture event bus, controllers, per-environment mapping tables
+  app/           composition root (App), the camera-to-gesture TrackingSession, test hook
+  vision/        webcam, MediaPipe wrapper, landmark processing, tracking loop
+  gestures/      finger classifier, recognisers, state machine, engine, smoothing, event types
+  interaction/   gesture event bus, controller, mouse/keyboard fallback, mapping tables
   environments/  particles, objects, galaxy
   rendering/     shaders, materials, shared effects
   state/         Zustand store
   ui/            screens, HUD components, controls
-  utils/         math, emitter, seeded RNG
-  main.ts        composition root
+  utils/         math, emitter, seeded RNG, parametric hand model
+  main.ts        entry point
 tests/
   unit/          Vitest
   e2e/           Playwright
@@ -52,16 +53,17 @@ through the pipeline, not to relax the rule.
 
 1. Write a recogniser in `src/gestures/recognizers/` implementing `HandRecognizer` or
    `TwoHandRecognizer`. Return a confidence between 0 and 1; do not keep state.
-2. Register it in `src/gestures/recognizers/index.ts`. Give it a `group` if it must be mutually
+2. Register it in `createDefaultRegistry()` in `src/gestures/recognizers/GestureRegistry.ts`. Give it a `group` if it must be mutually
    exclusive with other poses, and a `timing` block for its thresholds.
-3. Add a row for it to any mapping table in `src/interaction/mappings/` that should react.
-4. Add a fixture-based unit test in `tests/unit/`.
+3. Add a row for it to any mapping table in `src/interaction/mappings/index.ts` that should react.
+4. Add its label and instructions to `src/ui/gestureInfo.ts` so the HUD can name it.
+5. Add a unit test in `tests/unit/`; `tests/unit/helpers/hands.ts` builds synthetic hands in any pose.
 
 ## Adding an environment
 
-Implement `Environment` (extend `BaseEnvironment`), register a factory with the `SceneManager`,
-add a mapping table, and add an entry to the selector. The UI builds its control panel from
-`getControls()`.
+Implement `Environment` (extend `BaseEnvironment`), add it to `src/environments/index.ts`, add a
+mapping table to `DEFAULT_MAPPINGS`, and add its rows to `GESTURE_GUIDE` in `src/ui/gestureInfo.ts`.
+The selector, tabs and control panel are generated from those; the panel comes from `getControls()`.
 
 ## Testing
 
@@ -70,8 +72,9 @@ npm test            # unit tests
 npm run test:e2e    # Playwright (run `npx playwright install` once first)
 ```
 
-Browser tests start the app with Chromium's fake camera device. Because a fake camera cannot show
-a hand, gesture flows are driven by injecting synthetic landmark frames into the pipeline through
-the `window.__DUME__` test hook, which is only installed when the URL contains `?e2e=1`. That
-covers everything downstream of MediaPipe. Real-hand detection has to be checked by a person at a
+Browser tests build the app, serve it with `vite preview` and start Chromium with a fake camera
+device. Because a fake camera cannot show a hand, gesture flows are driven by injecting synthetic
+landmark frames ahead of the landmark processor through the `window.__DUME__` test hook
+(`src/app/testHook.ts`), which is only installed when the URL contains `?e2e=1`. That covers
+everything downstream of MediaPipe. Real-hand detection has to be checked by a person at a
 webcam; see the checklist in [GESTURE_CONTROLS.md](GESTURE_CONTROLS.md).

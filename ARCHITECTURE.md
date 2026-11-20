@@ -31,6 +31,10 @@ Enforced by `no-restricted-imports` in [eslint.config.js](eslint.config.js):
 - `src/core`, `src/environments` and `src/rendering` never import MediaPipe, `vision`, `gestures` or `ui`.
 - `src/interaction` never imports MediaPipe, Three.js, the webcam or the UI.
 - Only `src/main.ts` and `src/app` (the composition root) see everything, and they only wire things together.
+  `App` creates every system and joins it to its neighbours; `TrackingSession` is the one place the
+  camera, tracker, landmark processor and gesture engine are connected.
+- Mouse and keyboard (`FallbackInput`) publish the same `GestureEvent`s on the same bus, marked
+  `source: 'fallback'`, so there is one input path into the environments.
 
 An environment therefore cannot tell whether an action came from a hand, a mouse or a test.
 
@@ -87,7 +91,8 @@ still looks smooth at 60 fps.
 - No post-processing passes. Glow is additive blending on soft point sprites, which costs nothing
   extra and runs on integrated GPUs.
 - Pixel ratio is capped by quality tier (1 / 1.5 / 2) and particle budgets scale with it. The tier
-  is picked from a short frame-time probe at start-up and can be overridden in settings.
+  is guessed from device hints (GPU name, cores, memory), lowered automatically if the frame rate
+  stays under 38 fps for three seconds, and can be overridden in settings.
 - Geometries and materials are shared between like objects and tracked per environment; switching
   environments disposes everything the old one allocated.
 - One-Euro filtering smooths landmarks adaptively: heavy smoothing when the hand is still, almost
