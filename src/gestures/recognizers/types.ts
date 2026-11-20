@@ -42,6 +42,8 @@ export interface HandRecognizer {
   readonly kind: 'continuous' | 'discrete';
   /** Recognisers sharing a group are mutually exclusive on one hand; the most confident wins. */
   readonly group?: string;
+  /** While any of these gestures is active on the same hand, this one cannot start. */
+  readonly suppressedBy?: readonly GestureName[];
   readonly timing: GestureTiming;
   evaluate(hand: HandFrame, history: readonly MotionSample[]): RecognizerResult;
 }
