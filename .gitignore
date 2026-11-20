@@ -1,0 +1,19 @@
+node_modules/
+dist/
+public/mediapipe/
+.vite/
+coverage/
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+*.log
+.DS_Store
+.env
+.env.*
+!.env.example
+# never commit captured media
+*.webm
+*.mp4
+*.mov
+recordings/
