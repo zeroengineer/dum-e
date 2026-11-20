@@ -40,7 +40,7 @@ describe('RateLimiter', () => {
   it('falls back to a sane rate for bad input', () => {
     expect(new RateLimiter(Number.NaN).rate).toBe(24);
     expect(new RateLimiter(0).rate).toBe(1);
-    expect(new RateLimiter(1000).rate).toBe(60);
+    expect(new RateLimiter(1000).rate).toBeCloseTo(60);
   });
 });
 

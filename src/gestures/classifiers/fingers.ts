@@ -57,7 +57,7 @@ export function measureHand(hand: HandFrame): HandShape {
   }
 
   const extension = FINGERS.map((joints) =>
-    smoothstep(0.55, 0.88, straightness(p, joints)),
+    smoothstep(0.62, 0.9, straightness(p, joints)),
   ) as HandShape['extension'];
   const tipToPalm = FINGERS.map((joints) => dist3(p[joints[3]], palm)) as HandShape['tipToPalm'];
 

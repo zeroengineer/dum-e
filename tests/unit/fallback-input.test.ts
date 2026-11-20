@@ -89,7 +89,7 @@ describe('FallbackInput', () => {
     rig.key('keydown', 'f');
     rig.clear();
     rig.pointer('pointerdown', 20, 20, 0);
-    expect(rig.log()).toEqual(['hand:update', 'fist:end', 'pinch:start']);
+    expect(rig.log()).toEqual(['hand:update', 'fist:update', 'fist:end', 'pinch:start']);
   });
 
   it('turns arrow keys into swipes', () => {

@@ -69,7 +69,6 @@ interface TwoHandTrack extends Tracked {
 }
 
 const HAND_IDS: readonly HandId[] = ['Left', 'Right'];
-const PHASE_ORDER: Record<GesturePhase, number> = { end: 0, start: 1, update: 2 };
 
 /**
  * Watches processed hand frames and reports gestures as start / update / end events.
@@ -142,6 +141,7 @@ export class GestureEngine {
     const track = this.hands[id];
     const now = frame.timestamp;
     const events: GestureEvent[] = [];
+    const endings = new Set<GestureEvent>();
 
     if (!track.present) {
       track.present = true;
@@ -190,7 +190,8 @@ export class GestureEngine {
       }
       if (
         !tracked.machine.active &&
-        recognizer.suppressedBy?.some((other) => track.gestures.get(other)?.machine.active)
+        (recognizer.suppressedBy?.some((other) => track.gestures.get(other)?.machine.active) ||
+          this.groupBusy(recognizers, recognizer, track))
       ) {
         confidence = 0;
       }
@@ -210,15 +211,26 @@ export class GestureEngine {
         return;
       }
       const anchor = transition === 'start' ? null : tracked.anchor;
-      events.push(
-        this.handEvent(recognizer.id, transition, id, hand, now, confidence, x, y, anchor),
+      const event = this.handEvent(
+        recognizer.id,
+        transition,
+        id,
+        hand,
+        now,
+        confidence,
+        x,
+        y,
+        anchor,
       );
+      events.push(event);
+      if (transition === 'end') endings.add(event);
       tracked.anchor = transition === 'end' ? null : { x, y, roll: hand.roll };
     });
 
-    // Endings go out before beginnings so a listener never sees two poses on one hand at once.
-    events.sort((a, b) => PHASE_ORDER[a.phase] - PHASE_ORDER[b.phase]);
-    for (const event of events) this.sink(event);
+    // Endings of continuous gestures go out first, so a listener never sees a pose begin before
+    // the previous one has finished. Everything else keeps the order it was produced in.
+    for (const event of events) if (endings.has(event)) this.sink(event);
+    for (const event of events) if (!endings.has(event)) this.sink(event);
   }
 
   /** Within a group only the most confident recogniser may be active; the current one is favoured. */
@@ -238,6 +250,21 @@ export class GestureEngine {
     recognizers.forEach((recognizer, i) => {
       if (recognizer.group && winners.get(recognizer.group)?.index !== i) confidences[i] = 0;
     });
+  }
+
+  /** True while a different recogniser of the same group is still active on this hand. */
+  private groupBusy(
+    recognizers: readonly HandRecognizer[],
+    recognizer: HandRecognizer,
+    track: HandTrack,
+  ): boolean {
+    if (!recognizer.group) return false;
+    return recognizers.some(
+      (other) =>
+        other !== recognizer &&
+        other.group === recognizer.group &&
+        (track.gestures.get(other.id)?.machine.active ?? false),
+    );
   }
 
   private updateMissingHand(id: HandId, now: number): void {
