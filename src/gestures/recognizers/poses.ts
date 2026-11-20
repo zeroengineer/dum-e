@@ -36,7 +36,7 @@ const pinchCloseness = (shape: HandShape): number => 1 - smoothstep(0.2, 0.45, s
 
 function fistConfidence(shape: HandShape): number {
   const folded = shape.extension.map((extension, i) => {
-    const tucked = 1 - smoothstep(0.75, 1.25, shape.tipToPalm[i]);
+    const tucked = 1 - smoothstep(0.6, 1.05, shape.tipToPalm[i]);
     return (1 - extension) * tucked;
   });
   return consensus(folded);

@@ -133,7 +133,8 @@ describe('GestureEngine: poses', () => {
     const dx = updates.reduce((sum, e) => sum + e.dx, 0);
     const dRoll = updates.reduce((sum, e) => sum + e.dRoll, 0);
     expect(dx).toBeGreaterThan(0.2);
-    expect(dx).toBeLessThan(0.35);
+    // The pinch point also swings a little as the wrist turns.
+    expect(dx).toBeLessThan(0.42);
     expect(dRoll).toBeGreaterThan(0.5);
     expect(dRoll).toBeLessThan(0.9);
     expect(updates.every((e) => e.source === 'camera' && e.hand === 'Right')).toBe(true);

@@ -41,7 +41,8 @@ describe('custom geometries', () => {
     const p = twistedRingPositions(0.62, 0.2, 2, segments);
     const points = new Map<string, number>();
     for (let i = 0; i < p.length; i += 3) {
-      const key = `${p[i].toFixed(4)},${p[i + 1].toFixed(4)},${p[i + 2].toFixed(4)}`;
+      // Rounded integers, so that -0 and 0 land on the same key.
+      const key = [p[i], p[i + 1], p[i + 2]].map((v) => Math.round(v * 1e4) + 0).join(',');
       points.set(key, (points.get(key) ?? 0) + 1);
     }
     // In a watertight quad strip every corner is shared by exactly six triangles.

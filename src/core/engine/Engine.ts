@@ -46,6 +46,7 @@ export class Engine {
   private qualityPreference: 'auto' | QualityLevel = 'auto';
   private quality: QualityLevel;
   private particleBudget = 0;
+  private adaptationPausedUntil = 0;
 
   constructor(canvas: HTMLCanvasElement) {
     this.renderer = new RendererManager(canvas);
@@ -90,6 +91,15 @@ export class Engine {
   /** 0 restores the per-quality default. */
   setParticleBudget(count: number): void {
     this.particleBudget = count;
+  }
+
+  /**
+   * Ignore slow frames for a while. Used around known one-off stalls (loading the hand model),
+   * which say nothing about how fast the scene itself renders.
+   */
+  pauseQualityAdaptation(ms: number): void {
+    this.adaptationPausedUntil = performance.now() + ms;
+    this.lowFpsSeconds = 0;
   }
 
   start(): void {
@@ -162,6 +172,10 @@ export class Engine {
     this.events.emit('fps', fps);
 
     if (this.qualityPreference !== 'auto' || this.quality === 'low') return;
+    if (now < this.adaptationPausedUntil) {
+      this.lowFpsSeconds = 0;
+      return;
+    }
     this.lowFpsSeconds = fps < LOW_FPS ? this.lowFpsSeconds + span / 1000 : 0;
     if (this.lowFpsSeconds >= LOW_FPS_SECONDS) this.applyQuality(lowerQuality(this.quality));
   }
