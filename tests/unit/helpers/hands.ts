@@ -55,7 +55,7 @@ const CURLS: Record<Pose, { fingers: [number, number, number, number]; thumb: nu
   fist: { fingers: [1, 1, 1, 1], thumb: 1 },
   point: { fingers: [0, 1, 1, 1], thumb: 1 },
   pinch: { fingers: [0.45, 0.15, 0.1, 0.1], thumb: 0 },
-  relaxed: { fingers: [0.3, 0.35, 0.4, 0.4], thumb: 0.35 },
+  relaxed: { fingers: [0.6, 0.6, 0.6, 0.6], thumb: 0.35 },
 };
 
 /** Joint positions (pip, dip, tip) of one finger for a curl of 0 (straight) to 1 (fully folded). */
