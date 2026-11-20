@@ -1,5 +1,6 @@
 import type { Engine } from '../core/engine/Engine';
 import type { EnvironmentId } from '../core/scene/Environment';
+import { GalaxyExplorer } from './galaxy/GalaxyExplorer';
 import { ObjectLab } from './objects/ObjectLab';
 import { ParticleUniverse } from './particles/ParticleUniverse';
 
@@ -20,6 +21,11 @@ export const ENVIRONMENTS: readonly EnvironmentInfo[] = [
     name: 'Object Manipulation Lab',
     tagline: 'Point, pinch and throw geometric objects around a bench.',
   },
+  {
+    id: 'galaxy',
+    name: 'Galaxy Explorer',
+    tagline: 'Turn, stretch and fly through a procedural spiral galaxy.',
+  },
 ];
 
 export function isEnvironmentId(value: unknown): value is EnvironmentId {
@@ -29,4 +35,5 @@ export function isEnvironmentId(value: unknown): value is EnvironmentId {
 export function registerEnvironments(engine: Engine): void {
   engine.register('particles', () => new ParticleUniverse());
   engine.register('objects', () => new ObjectLab());
+  engine.register('galaxy', () => new GalaxyExplorer());
 }
