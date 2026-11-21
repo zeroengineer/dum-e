@@ -21,7 +21,8 @@ interface Hand {
   y: number;
   /** Palm size in screen heights; 0 for a mouse, which has no size. */
   size: number;
-  roll: number;
+  /** The same, eased: the reading is noisy and the globe's size hangs on it. */
+  steadySize: number;
   vx: number;
   vy: number;
   /** Seconds since this hand was last reported. */
@@ -35,7 +36,7 @@ const createHand = (): Hand => ({
   x: 0,
   y: 0,
   size: 0,
-  roll: 0,
+  steadySize: 0,
   vx: 0,
   vy: 0,
   age: 0,
@@ -50,12 +51,18 @@ export interface GlobeOptions {
   spinSpeed: number;
   /** How quickly the globe catches up with the hand; higher is tighter. */
   follow: number;
+  /**
+   * How high the globe rides above the palm, in globe radii from the palm to the globe's
+   * centre. 1 rests its lowest point on the palm; 0 centres it on the palm.
+   */
+  hover: number;
 }
 
 export const DEFAULT_GLOBE_OPTIONS: GlobeOptions = {
   baseRadius: GLOBE_RADIUS_DEFAULT,
   spinSpeed: 0.35,
-  follow: 16,
+  follow: 22,
+  hover: 1.08,
 };
 
 /**
@@ -63,7 +70,7 @@ export const DEFAULT_GLOBE_OPTIONS: GlobeOptions = {
  * positions are normalised device coordinates (-1..1, y up) and sizes are fractions of screen
  * height, so the behaviour can be reasoned about and tested without a 3D scene.
  *
- * - One hand: the globe rides just beyond the palm, toward the fingers.
+ * - One hand: the globe rests on the palm, straight above it on screen.
  * - Two hands: it sits between the palms and fills the gap.
  * - Pinch: it stays put and the hand's movement spins it; it keeps turning when released.
  * - Fist: it folds up small. Open palm: a pulse.
@@ -131,6 +138,10 @@ export class GlobeState {
     return this.options.follow;
   }
 
+  get hover(): number {
+    return this.options.hover;
+  }
+
   get grabbing(): boolean {
     return this.hands[0].grabbing || this.hands[1].grabbing;
   }
@@ -153,8 +164,12 @@ export class GlobeState {
     this.options.follow = clamp(follow, 1, 60);
   }
 
+  setHover(hover: number): void {
+    this.options.hover = clamp(hover, 0, 3);
+  }
+
   /** A hand appeared, moved or (`present` false) left. `size` is 0 when unknown. */
-  setHand(slot: 0 | 1, present: boolean, x = 0, y = 0, size = 0, roll = 0): void {
+  setHand(slot: 0 | 1, present: boolean, x = 0, y = 0, size = 0): void {
     const hand = this.hands[slot];
     if (!present) {
       hand.present = false;
@@ -171,12 +186,12 @@ export class GlobeState {
     } else {
       hand.vx = 0;
       hand.vy = 0;
+      hand.steadySize = size;
     }
     hand.present = true;
     hand.x = x;
     hand.y = y;
     hand.size = size;
-    hand.roll = roll;
     hand.age = 0;
     if (this.holder === null) this.takeHold(slot);
   }
@@ -257,7 +272,10 @@ export class GlobeState {
   }
 
   update(dt: number): void {
-    for (const hand of this.hands) hand.age += dt;
+    for (const hand of this.hands) {
+      hand.age += dt;
+      if (hand.present) hand.steadySize = damp(hand.steadySize, hand.size, 5, dt);
+    }
     this.sinceGrabMove += dt;
     const grabbing = this.grabbing;
 
@@ -312,14 +330,15 @@ export class GlobeState {
       this.goalY = py;
       return;
     }
-    // Ride beyond the palm in the direction the fingers point.
-    const lift = this.radius * 0.75 + hand.size * 0.55;
-    this.goalX = px + (Math.sin(hand.roll) * lift * 2) / this.aspect;
-    this.goalY = py + Math.cos(hand.roll) * lift * 2;
+    // Rest on the palm: straight above it on screen, the way a thing held in a hand sits
+    // whichever way the hand is turned. Which way the fingers point is deliberately ignored;
+    // for a palm-up hand they point at the camera and their direction on screen is noise.
+    this.goalX = px;
+    this.goalY = py + this.radius * this.options.hover * 2;
     if (!this.spanning) {
       // Bringing the hand nearer the camera makes the globe bigger, as a real one would look.
-      const depth = this.referenceSize > 0 ? Math.sqrt(hand.size / this.referenceSize) : 1;
-      this.radiusGoal = clampRadius(this.options.baseRadius * clamp(depth, 0.7, 1.5));
+      const depth = this.referenceSize > 0 ? Math.sqrt(hand.steadySize / this.referenceSize) : 1;
+      this.radiusGoal = clampRadius(this.options.baseRadius * clamp(depth, 0.75, 1.45));
     }
   }
 
@@ -329,7 +348,7 @@ export class GlobeState {
   }
 
   private rebaseHolder(): void {
-    this.referenceSize = this.holder === null ? 0 : this.hands[this.holder].size;
+    this.referenceSize = this.holder === null ? 0 : this.hands[this.holder].steadySize;
   }
 }
 

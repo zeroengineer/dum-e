@@ -186,6 +186,41 @@ test.describe('Holo Globe', () => {
     expect(errors).toEqual([]);
   });
 
+  test('rests above the palm however the hand is turned, and can show what it tracks', async ({
+    page,
+  }) => {
+    await openWorld(page, 'globe');
+    const at = async () => (await inspect(page)) as { x: number; y: number; radius: number };
+
+    await feed(page, 14, [{ pose: 'open', x: 0.6, y: 0.7 }]);
+    await page.waitForTimeout(500);
+    const upright = await at();
+    // Image (0.6, 0.7) is device (0.2, -0.4): centred over the palm, resting on it.
+    expect(upright.x).toBeCloseTo(0.2, 1);
+    expect(upright.y - upright.radius * 2).toBeGreaterThan(-0.45);
+    expect(upright.y - upright.radius * 2).toBeLessThan(-0.25);
+
+    // The same hand lying on its side: the globe does not swing round to follow the fingers.
+    await feed(page, 14, [{ pose: 'open', x: 0.6, y: 0.7, roll: Math.PI / 2 }]);
+    await page.waitForTimeout(500);
+    const sideways = await at();
+    expect(sideways.x).toBeCloseTo(upright.x, 1);
+    expect(sideways.y).toBeCloseTo(upright.y, 1);
+
+    // Lifting it off the palm is a control.
+    await page.getByLabel('Height above palm').fill('2');
+    await feed(page, 10, [{ pose: 'open', x: 0.6, y: 0.7, roll: Math.PI / 2 }]);
+    await expect.poll(async () => (await at()).y).toBeGreaterThan(sideways.y + 0.15);
+
+    // One palm and five fingertips, drawn where the globe believes they are.
+    expect((await inspect(page)).tracked).toBe(0);
+    await page.getByLabel('Show tracked points').check();
+    await feed(page, 4, [{ pose: 'open', x: 0.6, y: 0.7 }]);
+    await expect.poll(async () => (await inspect(page)).tracked).toBe(6);
+    await feed(page, 14, []);
+    await expect.poll(async () => (await inspect(page)).tracked).toBe(0);
+  });
+
   test('sits between two hands, follows the gap, and keeps the size they made', async ({
     page,
   }) => {

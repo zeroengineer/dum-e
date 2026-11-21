@@ -70,6 +70,21 @@ describe('LandmarkProcessor', () => {
     expect(makeHandFrame({ pose: 'fist', roll: -1.1 }).roll).toBeCloseTo(-1.1, 5);
   });
 
+  it('keeps its size reading when the hand tips toward the camera', () => {
+    // Palm up, fingers toward the camera: the hand's length on screen collapses, its width
+    // does not. Size is how near the hand is, so it must not collapse with the length.
+    const flat = makeRawHand({ pose: 'open', x: 0.5, y: 0.5, size: 0.24 });
+    const wristY = flat.landmarks[0].y;
+    const tipped = {
+      ...flat,
+      landmarks: flat.landmarks.map((p) => ({ ...p, y: wristY + (p.y - wristY) * 0.25 })),
+    };
+    const processor = new LandmarkProcessor();
+    const size = processor.process({ timestamp: 0, aspect: 4 / 3, hands: [tipped] }).hands[0].size;
+    expect(size).toBeGreaterThan(0.24 * 0.85);
+    expect(size).toBeLessThan(0.24 * 1.1);
+  });
+
   it('produces local coordinates that ignore position, size and distance', () => {
     const a = makeHandFrame({ pose: 'pinch', x: 0.2, y: 0.3, size: 0.12 });
     const b = makeHandFrame({ pose: 'pinch', x: 0.8, y: 0.7, size: 0.3 });

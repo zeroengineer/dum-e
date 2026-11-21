@@ -103,7 +103,7 @@ The camera picture fills the screen and a holographic globe sits in it, on your 
 
 | Gesture             | Effect                                                                     |
 | ------------------- | -------------------------------------------------------------------------- |
-| Show one hand       | The globe rides just beyond your palm, toward your fingers                 |
+| Show one hand       | The globe rests on your palm, straight above it on screen                  |
 | Move hand nearer    | The globe grows; farther away, it shrinks                                  |
 | Two hands           | The globe sits between your palms and fills the gap                        |
 | Two hands apart     | Grow                                                                       |
@@ -133,7 +133,12 @@ Effects, one at a time, cross-fading when you change:
 - **None**: the plain globe.
 
 The Controls panel sets look, effect, colour, size, spin speed, glow, how much the camera picture
-is dimmed, and how tightly the globe follows your hand.
+is dimmed, how high the globe rides above your palm, and how tightly it follows your hand.
+
+**Show tracked points** draws an amber dot on each palm and fingertip the tracker reports, where
+the globe believes they are. If the dots sit on your hand in the picture, tracking and picture
+agree and anything that looks wrong is the globe's placement (adjust Height above palm). If the
+dots are off your hand, that is the fault to report.
 
 With the camera off the globe floats in a starfield and the mouse carries it: move to carry, drag
 to spin, wheel to resize. With the camera on the mouse no longer carries it, so reaching for a
@@ -163,9 +168,10 @@ Automated tests cannot put a hand in front of the camera, so these need a person
 5. Show both hands and move them apart: Two hands appears and the scene zooms or scales smoothly.
 6. Cover the camera for a moment mid-pinch: the pinch should survive a blink and end after a longer loss.
 7. In each world, try every row of its table above.
-8. In Holo Globe, hold up one open hand: the globe should sit just above your palm and stay on it
-   as you move, with no visible offset to one side. If it sits beside your hand, the picture and
-   the positions disagree; report the screen and camera shapes.
+8. In Holo Globe, turn on Show tracked points and hold up one open hand: an amber dot should sit
+   on your palm and on each fingertip. Then hold the hand palm-up: the globe should rest on it and
+   stay put as you tilt and turn the hand. If the dots are off your hand, report the screen and
+   camera shapes.
 
 If poses are missed or trigger too easily, adjust Gesture sensitivity first. The thresholds
 themselves live in `src/gestures/recognizers/`.

@@ -6,6 +6,7 @@ import {
   Mesh,
   PlaneGeometry,
   Points,
+  PointsMaterial,
   Quaternion,
   Sphere,
   SphereGeometry,
@@ -107,6 +108,11 @@ export class HoloGlobe extends BaseEnvironment {
   private readonly tipPoints = Array.from({ length: TIP_COUNT }, () => new Vector2());
   private readonly tips = Array.from({ length: TIP_COUNT }, () => new Vector3());
   private readonly tipsPresent = new Array<boolean>(TIP_COUNT).fill(false);
+  /** Where each palm was last reported on screen, for the tracked-points display. */
+  private readonly palmPoints = [new Vector2(), new Vector2()];
+  private readonly palmsPresent = [false, false];
+  private markers!: Points<BufferGeometry, PointsMaterial>;
+  private showTracked = false;
   private readonly spin = new Quaternion();
   private readonly turn = new Quaternion();
   private dots!: Points<BufferGeometry, ShaderMaterial>;
@@ -193,6 +199,49 @@ export class HoloGlobe extends BaseEnvironment {
     this.lines.renderOrder = 3;
     this.dots.renderOrder = 4;
     this.scene.add(this.globe);
+
+    // The points hand tracking reports, drawn where the globe believes they are: one per palm
+    // and one per fingertip. If they do not sit on the hand in the picture, tracking and
+    // picture disagree, and that is the thing to fix rather than the globe's placement.
+    const markerGeometry = this.resources.track(new BufferGeometry());
+    markerGeometry.setAttribute(
+      'position',
+      new BufferAttribute(new Float32Array((2 + TIP_COUNT) * 3), 3),
+    );
+    this.markers = new Points(
+      markerGeometry,
+      this.resources.track(
+        new PointsMaterial({
+          color: '#ffb454',
+          size: 10,
+          sizeAttenuation: false,
+          depthTest: false,
+          depthWrite: false,
+          toneMapped: false,
+        }),
+      ),
+    );
+    this.markers.frustumCulled = false;
+    this.markers.renderOrder = 20;
+    this.markers.visible = false;
+    this.scene.add(this.markers);
+  }
+
+  /** Lays the tracked points out for drawing: palms first, then fingertips, live ones only. */
+  private updateMarkers(): void {
+    const live = this.showTracked && (this.palmsPresent[0] || this.palmsPresent[1]);
+    this.markers.visible = live;
+    if (!live) return;
+    const attribute = this.markers.geometry.getAttribute('position') as BufferAttribute;
+    let count = 0;
+    const put = (point: Vector2): void => {
+      ndcToPlane(this.camera, point.x, point.y, ORIGIN, this.place);
+      attribute.setXYZ(count++, this.place.x, this.place.y, this.place.z);
+    };
+    for (let hand = 0; hand < 2; hand++) if (this.palmsPresent[hand]) put(this.palmPoints[hand]);
+    for (let i = 0; i < TIP_COUNT; i++) if (this.tipsPresent[i]) put(this.tipPoints[i]);
+    attribute.needsUpdate = true;
+    this.markers.geometry.setDrawRange(0, count);
   }
 
   // --- the camera picture ------------------------------------------------------------------
@@ -259,6 +308,15 @@ export class HoloGlobe extends BaseEnvironment {
       },
       {
         kind: 'range',
+        id: 'hover',
+        label: 'Height above palm',
+        min: 0,
+        max: 2.5,
+        step: 0.05,
+        value: this.state.hover,
+      },
+      {
+        kind: 'range',
         id: 'follow',
         label: 'Follow speed',
         min: 4,
@@ -266,6 +324,7 @@ export class HoloGlobe extends BaseEnvironment {
         step: 1,
         value: this.state.follow,
       },
+      { kind: 'toggle', id: 'tracked', label: 'Show tracked points', value: this.showTracked },
       { kind: 'button', id: 'next', label: 'Next effect' },
     ];
   }
@@ -274,6 +333,11 @@ export class HoloGlobe extends BaseEnvironment {
     if (id === 'next') {
       this.cycleEffect(1);
       return; // cycleEffect notifies
+    }
+    if (id === 'tracked') {
+      this.showTracked = value === true;
+      this.notifyControlsChanged();
+      return;
     }
     if (id === 'effect') {
       if (!GLOBE_EFFECT_CHOICES.includes(value as EffectChoice)) return;
@@ -298,6 +362,8 @@ export class HoloGlobe extends BaseEnvironment {
       this.backdrop.setDimming(this.dimming);
     } else if (id === 'follow') {
       this.state.setFollow(value);
+    } else if (id === 'hover') {
+      this.state.setHover(value);
     } else {
       return;
     }
@@ -320,6 +386,8 @@ export class HoloGlobe extends BaseEnvironment {
     this.state.reset();
     this.state.setSpinSpeed(DEFAULT_GLOBE_OPTIONS.spinSpeed);
     this.state.setFollow(DEFAULT_GLOBE_OPTIONS.follow);
+    this.state.setHover(DEFAULT_GLOBE_OPTIONS.hover);
+    this.showTracked = false;
     this.look = DEFAULTS.look;
     this.colour = DEFAULTS.colour;
     this.setEffect(DEFAULTS.effect);
@@ -344,6 +412,7 @@ export class HoloGlobe extends BaseEnvironment {
       look: this.look,
       effect: this.effect,
       video: this.backdrop.live,
+      tracked: this.markers.visible ? this.markers.geometry.drawRange.count : 0,
       ...(this.effect === 'none' ? null : this.effects.get(this.effect)?.effect.inspect?.()),
     };
   }
@@ -406,12 +475,10 @@ export class HoloGlobe extends BaseEnvironment {
         // With the camera picture up the globe belongs to the hands in it; a mouse passing over
         // on its way to a button must not carry it off. The mouse can still spin and resize it.
         const stray = action.space === 'screen' && this.backdrop.live;
-        this.readTips(
-          action.hand,
-          action.phase === 'end' || stray ? undefined : action.tips,
-          action.space,
-        );
-        if (action.phase === 'end' || stray) {
+        const gone = action.phase === 'end' || stray;
+        this.palmsPresent[action.hand] = !gone;
+        this.readTips(action.hand, gone ? undefined : action.tips, action.space);
+        if (gone) {
           this.state.setHand(action.hand, false);
           break;
         }
@@ -422,8 +489,8 @@ export class HoloGlobe extends BaseEnvironment {
           at.x,
           at.y,
           this.toScreenHeights(action.space, action.size),
-          action.roll,
         );
+        this.palmPoints[action.hand].copy(at);
         break;
       }
       case 'span': {
@@ -497,6 +564,7 @@ export class HoloGlobe extends BaseEnvironment {
 
     const state = this.state;
     state.update(dt);
+    this.updateMarkers();
 
     // Screen terms to scene terms: the globe lives on the plane through the origin.
     ndcToPlane(this.camera, state.x, state.y, ORIGIN, this.place);

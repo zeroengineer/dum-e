@@ -34,6 +34,11 @@ interface Slot {
   velocity: Vec2;
 }
 
+/**
+ * A palm is about 1.45 times as long (wrist to middle knuckle) as it is wide (index knuckle to
+ * little-finger knuckle). Slightly under that here, so a flat hand is measured by its length.
+ */
+const WIDTH_TO_LENGTH = 1.4;
 const PALM_POINTS = [LM.WRIST, LM.INDEX_MCP, LM.MIDDLE_MCP, LM.RING_MCP, LM.PINKY_MCP] as const;
 const OTHER: Record<HandId, HandId> = { Left: 'Right', Right: 'Left' };
 const HAND_ORDER: readonly HandId[] = ['Left', 'Right'];
@@ -171,6 +176,16 @@ export class LandmarkProcessor {
     slot.lastPalm = { ...palm };
     slot.lastSeen = timestamp;
 
+    // How big the palm looks is the cue for how near the hand is. Its length alone collapses
+    // when the fingers point at the camera (a hand held palm-up), and its width alone when the
+    // hand is seen edge-on; the larger of the two survives either.
+    const indexKnuckle = landmarks[LM.INDEX_MCP];
+    const pinkyKnuckle = landmarks[LM.PINKY_MCP];
+    const palmWidth = Math.hypot(
+      (pinkyKnuckle.x - indexKnuckle.x) * aspect,
+      pinkyKnuckle.y - indexKnuckle.y,
+    );
+
     const thumb = landmarks[LM.THUMB_TIP];
     const index = landmarks[LM.INDEX_TIP];
     return {
@@ -181,7 +196,7 @@ export class LandmarkProcessor {
       palm,
       pinchPoint: { x: (thumb.x + index.x) / 2, y: (thumb.y + index.y) / 2 },
       indexTip: { x: index.x, y: index.y },
-      size: Math.hypot(palmX, palmY),
+      size: Math.max(Math.hypot(palmX, palmY), palmWidth * WIDTH_TO_LENGTH),
       // Fingers pointing up is 0; screen y grows downward, hence the negation.
       roll: Math.atan2(palmX, -palmY),
       velocity: { ...slot.velocity },
