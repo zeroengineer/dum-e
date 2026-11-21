@@ -19,8 +19,8 @@ test.describe('performance readout', () => {
     await expect(overlay).toContainText(/median/);
     await expect(overlay).toContainText(/[\d,]+ points/);
     await expect(overlay).toContainText('Tracking');
-    // Opening the world generated a galaxy; both stalls were timed.
-    await expect(overlay).toContainText(/galaxy:rebuild \d+\.\d ms/);
+    // Opening the world and installing its stars were both timed.
+    await expect(overlay).toContainText(/galaxy:apply \d+\.\d ms/);
     await expect(overlay).toContainText(/activate:galaxy \d+\.\d ms/);
     expect(errors).toEqual([]);
   });

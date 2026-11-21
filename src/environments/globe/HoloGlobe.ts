@@ -31,7 +31,8 @@ import { clamp, damp, lerp } from '../../utils/math';
 import { timed } from '../../utils/perf';
 import { GLOBE_EFFECTS, GLOBE_EFFECT_CHOICES } from './effects';
 import type { GlobeEffect, GlobeEffectName, GlobeParts } from './effects';
-import { generateGlobeDots, generateGraticule } from './geometry';
+import { generate } from '../generation/generate';
+import { generateGraticule } from './geometry';
 import {
   COLLAPSED_SCALE,
   DEFAULT_GLOBE_OPTIONS,
@@ -124,6 +125,7 @@ export class HoloGlobe extends BaseEnvironment {
   private readonly place = new Vector3();
   private readonly point = new Vector2();
   private readonly bufferSize = new Vector2();
+  private disposed = false;
 
   protected build(): void {
     this.camera.position.set(0, 0, CAMERA_DISTANCE);
@@ -146,15 +148,20 @@ export class HoloGlobe extends BaseEnvironment {
   }
 
   private buildGlobe(): void {
-    const generated = generateGlobeDots(DOTS_MAX);
+    // The dots are placed in the background; the rest of the globe is on screen meanwhile.
     const dotGeometry = this.resources.track(new BufferGeometry());
-    dotGeometry.setAttribute('position', new BufferAttribute(generated.positions, 3));
-    dotGeometry.setAttribute('aSeed', new BufferAttribute(generated.seeds, 4));
     dotGeometry.boundingSphere = new Sphere(new Vector3(), 1);
+    void generate({ kind: 'globeDots', count: DOTS_MAX }).then((result) => {
+      if (this.disposed || result.kind !== 'globeDots') return;
+      dotGeometry.setAttribute('position', new BufferAttribute(result.positions, 3));
+      dotGeometry.setAttribute('aSeed', new BufferAttribute(result.seeds, 4));
+      this.dots.visible = true;
+    });
     this.dots = new Points(
       dotGeometry,
       this.resources.track(createGlobeDotsMaterial(this.ctx.maxPointSize)),
     );
+    this.dots.visible = false;
     // Point size depends on the drawing buffer height, which only the renderer knows.
     this.dots.onBeforeRender = (renderer: WebGLRenderer) => {
       this.dots.material.uniforms.uViewportHeight.value = renderer.getDrawingBufferSize(
@@ -553,6 +560,7 @@ export class HoloGlobe extends BaseEnvironment {
   }
 
   dispose(): void {
+    this.disposed = true;
     this.backdrop.dispose();
     this.starfield?.dispose();
     this.starfield = null;

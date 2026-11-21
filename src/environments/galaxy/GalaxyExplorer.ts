@@ -9,15 +9,15 @@ import { Starfield } from '../../rendering/effects/Starfield';
 import { createGalaxyMaterial } from '../../rendering/materials/galaxyMaterial';
 import { clamp, damp } from '../../utils/math';
 import { timed } from '../../utils/perf';
+import { generate } from '../generation/generate';
 import {
   GALAXY_LIMITS,
   GALAXY_PRESETS,
   GALAXY_PRESET_NAMES,
   GALAXY_RADIUS,
-  generateGalaxy,
   sanitizeGalaxyConfig,
 } from './generator';
-import type { GalaxyConfig, GalaxyPresetName, GalaxyShape } from './generator';
+import type { GalaxyBuffers, GalaxyConfig, GalaxyPresetName, GalaxyShape } from './generator';
 
 export const GALAXY_PALETTES = {
   classic: { label: 'Classic', core: '#ffe2a8', arm: '#7fb4ff', accent: '#ff7bd5' },
@@ -58,6 +58,10 @@ export class GalaxyExplorer extends BaseEnvironment {
   private reveal = 0;
   private revealGoal = 1;
   private pendingRebuild = false;
+  /** Bumped by every change of shape, to notice one that arrives while stars are being made. */
+  private configVersion = 0;
+  private generating = false;
+  private disposed = false;
   private pendingAge = 0;
   private expand = 1;
   private readonly handMode: ['none' | 'expand' | 'attract', 'none' | 'expand' | 'attract'] = [
@@ -86,7 +90,7 @@ export class GalaxyExplorer extends BaseEnvironment {
 
     this.explicitStars = false;
     this.config.stars = QUALITY_PROFILES[this.ctx.quality].stars;
-    this.rebuild();
+    this.startGeneration();
 
     this.starfield = new Starfield(QUALITY_PROFILES[this.ctx.quality].backdropStars, 110, 31);
     this.scene.add(this.starfield.points);
@@ -318,7 +322,7 @@ export class GalaxyExplorer extends BaseEnvironment {
 
     if (this.pendingRebuild) {
       this.pendingAge += dt;
-      if (this.reveal < 0.03 && this.pendingAge >= REBUILD_SETTLE) this.rebuild();
+      if (this.reveal < 0.03 && this.pendingAge >= REBUILD_SETTLE) this.startGeneration();
     }
     // Collapse quickly, unfold slowly.
     this.reveal = damp(this.reveal, this.revealGoal, this.revealGoal === 0 ? 9 : 2.6, dt);
@@ -331,18 +335,32 @@ export class GalaxyExplorer extends BaseEnvironment {
 
   /** Collapse the current galaxy; the new one is generated once it has folded into the core. */
   private requestRebuild(): void {
+    this.configVersion++;
     this.pendingRebuild = true;
     this.pendingAge = 0;
     this.revealGoal = 0;
   }
 
-  private rebuild(): void {
-    timed('galaxy:rebuild', () => this.generate());
+  /** Has the stars made in the background; the galaxy stays folded up until they arrive. */
+  private startGeneration(): void {
+    if (this.generating || this.disposed) return;
+    this.generating = true;
+    this.config = sanitizeGalaxyConfig(this.config);
+    const version = this.configVersion;
+    void generate({ kind: 'galaxy', config: { ...this.config } }).then((result) => {
+      this.generating = false;
+      if (this.disposed || result.kind !== 'galaxy') return;
+      timed('galaxy:apply', () => this.install(result));
+      if (version !== this.configVersion) {
+        // The shape changed again while these stars were being made: stay folded for the next.
+        this.pendingRebuild = true;
+        this.pendingAge = 0;
+        this.revealGoal = 0;
+      }
+    });
   }
 
-  private generate(): void {
-    this.config = sanitizeGalaxyConfig(this.config);
-    const buffers = generateGalaxy(this.config);
+  private install(buffers: GalaxyBuffers): void {
     if (this.points) {
       this.resources.release(this.points.geometry);
       this.points.removeFromParent();
@@ -369,6 +387,7 @@ export class GalaxyExplorer extends BaseEnvironment {
   }
 
   dispose(): void {
+    this.disposed = true;
     this.starfield?.dispose();
     this.starfield = null;
     this.points?.removeFromParent();
