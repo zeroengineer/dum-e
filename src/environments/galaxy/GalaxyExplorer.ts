@@ -8,6 +8,7 @@ import type { EnvironmentAction } from '../../interaction/actions';
 import { Starfield } from '../../rendering/effects/Starfield';
 import { createGalaxyMaterial } from '../../rendering/materials/galaxyMaterial';
 import { clamp, damp } from '../../utils/math';
+import { timed } from '../../utils/perf';
 import {
   GALAXY_LIMITS,
   GALAXY_PRESETS,
@@ -336,6 +337,10 @@ export class GalaxyExplorer extends BaseEnvironment {
   }
 
   private rebuild(): void {
+    timed('galaxy:rebuild', () => this.generate());
+  }
+
+  private generate(): void {
     this.config = sanitizeGalaxyConfig(this.config);
     const buffers = generateGalaxy(this.config);
     if (this.points) {

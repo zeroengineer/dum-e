@@ -4,6 +4,14 @@ import type { DeviceHints } from '../engine/quality';
 
 export const BACKGROUND_COLOR = 0x04060c;
 
+/** What the last rendered frame cost the GPU to submit. */
+export interface RenderStats {
+  drawCalls: number;
+  points: number;
+  triangles: number;
+  lines: number;
+}
+
 /** Owns the WebGL renderer: creation, sizing, pixel ratio and context loss. */
 export class RendererManager {
   readonly renderer: WebGLRenderer;
@@ -68,6 +76,12 @@ export class RendererManager {
 
   render(scene: Scene, camera: Camera): void {
     if (!this.contextLost) this.renderer.render(scene, camera);
+  }
+
+  /** Counts for the most recent `render` call. */
+  stats(): RenderStats {
+    const { calls, points, triangles, lines } = this.renderer.info.render;
+    return { drawCalls: calls, points, triangles, lines };
   }
 
   dispose(): void {

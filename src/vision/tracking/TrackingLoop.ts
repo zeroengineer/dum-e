@@ -11,6 +11,8 @@ interface TrackingLoopEvents {
   frame: RawHandFrame;
   /** Detections per second actually achieved, about once a second. */
   rate: number;
+  /** Mean time one detection blocked the main thread, in milliseconds, reported with `rate`. */
+  detectMs: number;
   /** The detector kept throwing; the loop has stopped itself. */
   error: Error;
 }
@@ -41,6 +43,8 @@ export class TrackingLoop implements LandmarkSource {
   private lastVideoTime = -1;
   private lastTimestamp = 0;
   private errors = 0;
+  private detectTotal = 0;
+  private detectCount = 0;
 
   constructor(hz: number) {
     this.limiter = new RateLimiter(hz);
@@ -68,6 +72,8 @@ export class TrackingLoop implements LandmarkSource {
     this.lastVideoTime = -1;
     this.limiter.reset();
     this.meter.reset();
+    this.detectTotal = 0;
+    this.detectCount = 0;
     this.schedule();
   }
 
@@ -128,6 +134,8 @@ export class TrackingLoop implements LandmarkSource {
     let hands: RawHand[];
     try {
       hands = detector.detect(video, timestamp);
+      this.detectTotal += performance.now() - now;
+      this.detectCount++;
       this.errors = 0;
     } catch (error) {
       if (++this.errors >= MAX_CONSECUTIVE_ERRORS) {
@@ -143,6 +151,11 @@ export class TrackingLoop implements LandmarkSource {
       hands,
     });
     const rate = this.meter.tick(now);
-    if (rate !== null) this.events.emit('rate', rate);
+    if (rate !== null) {
+      this.events.emit('rate', rate);
+      this.events.emit('detectMs', this.detectTotal / Math.max(1, this.detectCount));
+      this.detectTotal = 0;
+      this.detectCount = 0;
+    }
   };
 }
