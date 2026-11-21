@@ -2,11 +2,15 @@ import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { watchErrors } from './helpers';
 
+// Each of these loads the hand model under software rendering, which is slow and heavy. Run in
+// parallel they starve each other and time out, so this file runs one test at a time and allows
+// each one longer than the default.
+test.describe.configure({ mode: 'default', timeout: 120_000 });
+
 const status = (page: Page) => page.evaluate(() => window.__DUME__?.state().tracking.status);
 const videoLive = (page: Page) => page.evaluate(() => window.__DUME__?.scene().videoLive);
 
 test('starting the experience turns the camera and tracker on, and off again', async ({ page }) => {
-  test.setTimeout(120_000); // loads the model twice under software rendering
   const errors = watchErrors(page);
   await page.goto('/?e2e=1');
   await page.getByRole('button', { name: 'Start experience' }).click();

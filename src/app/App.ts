@@ -153,6 +153,9 @@ export class App {
   private onSessionStatus(status: SessionStatus): void {
     // Starting the camera and compiling the hand model stalls the page for a moment.
     if (status.state !== 'off') this.engine.pauseQualityAdaptation(6000);
+    // A paused session (hidden tab) still holds the camera; every other state has no picture.
+    const live = status.state === 'active' || status.state === 'paused';
+    this.engine.setVideo(live ? this.session.video : null);
     switch (status.state) {
       case 'camera-failed':
         clearGestureState();

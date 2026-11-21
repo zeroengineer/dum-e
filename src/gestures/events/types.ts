@@ -1,3 +1,4 @@
+import type { Vec2 } from '../../utils/math';
 import type { HandId } from '../../vision/landmarks/types';
 
 export type GesturePhase = 'start' | 'update' | 'end';
@@ -39,8 +40,12 @@ export interface GestureEvent {
   scale: number;
   /** Two-hand distance relative to the previous event (1 otherwise). */
   dScale: number;
+  /** Distance between the two palms in image heights (0 unless both hands are tracked). */
+  span: number;
   /** Apparent hand size, a rough depth cue. */
   size: number;
+  /** Thumb to little finger tips in mirrored screen space. Only on `hand` events from the camera. */
+  tips?: Vec2[];
   direction?: SwipeDirection;
   source: 'camera' | 'fallback';
 }
@@ -61,6 +66,7 @@ export function createGestureEvent(
     dRoll: 0,
     scale: 1,
     dScale: 1,
+    span: 0,
     size: 0,
     source: 'camera',
     ...partial,

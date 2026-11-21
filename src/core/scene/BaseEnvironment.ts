@@ -21,6 +21,7 @@ export abstract class BaseEnvironment implements Environment {
     pixelRatio: 1,
     aspect: 1,
     maxPointSize: 64,
+    video: null,
   };
   private readonly controlListeners = new Set<() => void>();
 

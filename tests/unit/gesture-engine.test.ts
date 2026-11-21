@@ -238,6 +238,21 @@ describe('GestureEngine: swipe', () => {
   });
 });
 
+describe('GestureEngine: fingertips', () => {
+  it('carries the five fingertips on hand events only', () => {
+    const rig = createRig();
+    rig.run(8, [{ pose: 'open', x: 0.5, y: 0.5, size: 0.2 }]);
+    const hands = rig.of(GESTURES.HAND);
+    const tips = hands[hands.length - 1].tips;
+    expect(tips).toHaveLength(5);
+    // An open hand held upright: every fingertip is above the palm, spread left to right.
+    for (const tip of tips ?? []) expect(tip.y).toBeLessThan(0.5);
+    const xs = (tips ?? []).map((tip) => tip.x);
+    expect(Math.max(...xs) - Math.min(...xs)).toBeGreaterThan(0.05);
+    expect(rig.of(GESTURES.OPEN_PALM).every((e) => e.tips === undefined)).toBe(true);
+  });
+});
+
 describe('GestureEngine: two hands', () => {
   const pair = (gap: number): HandSpec[] => [
     { pose: 'open', x: 0.5 - gap / 2, handedness: 'Left' },
@@ -279,6 +294,18 @@ describe('GestureEngine: two hands', () => {
     const updates = rig.of(GESTURES.TWO_HAND, 'update');
     expect(updates.length).toBeGreaterThan(20);
     expect(updates.every((e) => e.dScale === 1)).toBe(true);
+  });
+
+  it('reports the gap between the palms in image heights', () => {
+    const rig = createRig();
+    rig.run(12, pair(0.3));
+    const updates = rig.of(GESTURES.TWO_HAND, 'update');
+    // 0.3 of the image width at 4:3 is 0.4 image heights.
+    expect(updates[updates.length - 1].span).toBeCloseTo(0.4, 1);
+    rig.run(12, (p) => pair(0.3 + p * 0.3));
+    rig.run(6, pair(0.6));
+    const wider = rig.of(GESTURES.TWO_HAND, 'update');
+    expect(wider[wider.length - 1].span).toBeCloseTo(0.8, 1);
   });
 
   it('ends when one hand leaves for longer than the grace window', () => {
