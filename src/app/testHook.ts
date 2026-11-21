@@ -16,7 +16,13 @@ export interface DumeTestHook {
   actions: EnvironmentAction[];
   clear(): void;
   /** Read-only facts about the scene for assertions. */
-  scene(): { environment: string | null; controls: Record<string, unknown>; videoLive: boolean };
+  scene(): {
+    environment: string | null;
+    controls: Record<string, unknown>;
+    videoLive: boolean;
+    /** Whatever the active world reports about itself. */
+    inspect: Record<string, number | string | boolean>;
+  };
   /** The latest profiling readout, or null before the first one. */
   perf(): (PerfSample & { fps: number; detectMs: number | null }) | null;
 }
@@ -69,6 +75,7 @@ export function installTestHook(app: App): DumeTestHook {
         environment: environment?.id ?? null,
         controls,
         videoLive: Boolean(stream?.getVideoTracks().some((t) => t.readyState === 'live')),
+        inspect: environment?.inspect?.() ?? {},
       };
     },
   };

@@ -98,6 +98,17 @@ export const GESTURE_GUIDE: Record<
     { gesture: GESTURES.TWO_HAND, does: 'Apart to zoom in, together to zoom out' },
     { gesture: GESTURES.SWIPE, does: 'Change configuration' },
   ],
+  globe: [
+    { gesture: GESTURES.HAND, does: 'Carry the globe on your hand' },
+    {
+      gesture: GESTURES.TWO_HAND,
+      does: 'Hold it between your hands; apart to grow, together to shrink',
+    },
+    { gesture: GESTURES.PINCH, does: 'Hold it still and spin it; turn your wrist to twist' },
+    { gesture: GESTURES.FIST, does: 'Fold it up small' },
+    { gesture: GESTURES.OPEN_PALM, does: 'Send out a pulse' },
+    { gesture: GESTURES.SWIPE, does: 'Change its look' },
+  ],
 };
 
 /** The order the tutorial teaches gestures in. */

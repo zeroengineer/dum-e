@@ -16,7 +16,7 @@ export function createLanding(app: App): { element: HTMLElement; dispose(): void
       h(
         'p',
         { class: 'landing__lede' },
-        'Three 3D worlds you move with your bare hands. Push a cloud of particles, pick up objects, turn a galaxy. Your webcam follows your fingers.',
+        'Four 3D worlds you move with your bare hands. Push a cloud of particles, pick up objects, turn a galaxy, hold a hologram of the Earth. Your webcam follows your fingers.',
       ),
       h(
         'div',

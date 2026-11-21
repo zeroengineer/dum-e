@@ -26,7 +26,7 @@ export function watchErrors(page: Page): string[] {
 /** Opens a world directly with the test hook installed and the tutorial out of the way. */
 export async function openWorld(
   page: Page,
-  env: 'particles' | 'objects' | 'galaxy',
+  env: 'particles' | 'objects' | 'galaxy' | 'globe',
 ): Promise<void> {
   await page.addInitScript(() => {
     if (!localStorage.getItem('dum-e:settings:v1')) {
@@ -65,6 +65,10 @@ export const actionTypes = (page: Page): Promise<string[]> =>
 
 export const control = (page: Page, id: string): Promise<unknown> =>
   page.evaluate((key) => window.__DUME__?.scene().controls[key], id);
+
+/** What the active world reports about itself. */
+export const inspect = (page: Page): Promise<Record<string, number | string | boolean>> =>
+  page.evaluate(() => window.__DUME__?.scene().inspect ?? {});
 
 export const clearRecorded = (page: Page): Promise<void> =>
   page.evaluate(() => window.__DUME__?.clear());

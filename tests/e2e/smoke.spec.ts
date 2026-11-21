@@ -22,6 +22,7 @@ test('mouse-only path reaches every world and renders it', async ({ page }) => {
     ['Particle Universe', 'particles'],
     ['Object Manipulation Lab', 'objects'],
     ['Galaxy Explorer', 'galaxy'],
+    ['Holo Globe', 'globe'],
   ] as const;
   await page.getByRole('button', { name: /Particle Universe/ }).click();
   // First visit: the tutorial opens. Skip it.
@@ -42,8 +43,10 @@ test('mouse-only path reaches every world and renders it', async ({ page }) => {
 test('a world can be opened from the URL', async ({ page }) => {
   await page.goto('/?e2e=1&env=galaxy');
   await expect.poll(() => page.evaluate(() => window.__DUME__?.scene().environment)).toBe('galaxy');
-  await expect(page.getByRole('button', { name: 'Galaxy Explorer' })).toHaveAttribute(
-    'aria-pressed',
-    'true',
-  );
+  // The world list has a button of the same name; the tab is the one in the top bar.
+  await expect(
+    page
+      .getByRole('navigation', { name: 'Worlds' })
+      .getByRole('button', { name: 'Galaxy Explorer' }),
+  ).toHaveAttribute('aria-pressed', 'true');
 });

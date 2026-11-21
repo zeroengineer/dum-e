@@ -18,7 +18,7 @@ GestureEventBus          src/interaction/dispatcher
     ↓
 InteractionController    src/interaction          per-environment mapping tables
     ↓ EnvironmentAction
-Environment              src/environments         particles / objects / galaxy
+Environment              src/environments         particles / objects / galaxy / globe
 ```
 
 Data flows one way. Each stage knows the type it receives and the type it emits and nothing else.

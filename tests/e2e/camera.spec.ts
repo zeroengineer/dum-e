@@ -2,9 +2,8 @@ import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { watchErrors } from './helpers';
 
-// Each of these loads the hand model under software rendering, which is slow and heavy. Run in
-// parallel they starve each other and time out, so this file runs one test at a time and allows
-// each one longer than the default.
+// Each of these loads the hand model under software rendering, which is slow. They get longer
+// than the default, and playwright.config.ts runs this file last and alone.
 test.describe.configure({ mode: 'default', timeout: 120_000 });
 
 const status = (page: Page) => page.evaluate(() => window.__DUME__?.state().tracking.status);
@@ -42,6 +41,45 @@ test('starting the experience turns the camera and tracker on, and off again', a
 
   await page.getByRole('button', { name: 'Turn camera on' }).click();
   await expect.poll(() => status(page), { timeout: 20_000 }).toBe('active');
+  expect(errors).toEqual([]);
+});
+
+test('the globe world fills the screen with the camera picture and says so when it is off', async ({
+  page,
+}) => {
+  const errors = watchErrors(page);
+  await page.addInitScript(() => {
+    localStorage.setItem('dum-e:settings:v1', JSON.stringify({ tutorialSeen: true }));
+  });
+  await page.goto('/?e2e=1&env=globe');
+  const picture = () => page.evaluate(() => window.__DUME__?.scene().inspect.video);
+
+  // Camera off: no picture, and the world explains what turning it on would do.
+  await expect.poll(picture).toBe(false);
+  await expect(page.locator('.hud .notice')).toContainText('Camera is off');
+
+  await page.locator('.hud .notice').getByRole('button', { name: 'Turn camera on' }).click();
+  await expect.poll(() => status(page), { timeout: 60_000 }).toBe('active');
+  await expect.poll(picture).toBe(true);
+  await expect(page.locator('.hud .notice')).toBeHidden();
+  // The full-screen picture replaces the corner preview here, and only here.
+  await expect(page.locator('.preview')).toHaveClass(/preview--hidden/);
+  // The globe now belongs to hands in the picture: the mouse passing over does not carry it.
+  const where = () => page.evaluate(() => window.__DUME__?.scene().inspect.x);
+  const parked = (await where()) as number;
+  const box = (await page.locator('#stage').boundingBox())!;
+  await page.mouse.move(box.x + box.width * 0.5, box.y + box.height * 0.6);
+  await page.mouse.move(box.x + box.width * 0.4, box.y + box.height * 0.8, { steps: 6 });
+  await page.waitForTimeout(600);
+  expect(await where()).toBeCloseTo(parked, 2);
+  await page.screenshot({ path: 'test-results/globe-camera.png' });
+  await page.keyboard.press('3');
+  await expect(page.locator('.preview')).not.toHaveClass(/preview--hidden/);
+  await page.keyboard.press('4');
+  await expect.poll(picture).toBe(true);
+
+  await page.getByRole('button', { name: 'Turn camera off' }).click();
+  await expect.poll(picture).toBe(false);
   expect(errors).toEqual([]);
 });
 

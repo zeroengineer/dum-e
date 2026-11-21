@@ -1,6 +1,6 @@
 # DUM-E
 
-Three 3D environments in the browser that you control with your hands. A webcam and
+Four 3D environments in the browser that you control with your hands. A webcam and
 MediaPipe's Hand Landmarker track up to two hands; a custom gesture engine turns the landmarks
 into gestures; Three.js renders the result. Nothing leaves your machine: there is no backend and
 the video is never recorded or uploaded.
@@ -10,6 +10,7 @@ the video is never recorded or uploaded.
 | Particle Universe       | Push, pull, grab and reshape tens of thousands of particles |
 | Object Manipulation Lab | Point at, grab, move, rotate and scale geometric objects    |
 | Galaxy Explorer         | Spin, stretch and fly around a procedural spiral galaxy     |
+| Holo Globe              | Hold a hologram of the Earth in your hand, on camera        |
 
 Mouse and keyboard work everywhere as a fallback, so the app is usable without a camera.
 
@@ -23,7 +24,7 @@ Mouse and keyboard work everywhere as a fallback, so the app is usable without a
    gesture does there; Controls has a slider or button for everything; the corner shows the
    camera with your tracked hand drawn on it.
 
-`?env=particles`, `?env=objects` or `?env=galaxy` in the URL opens a world directly.
+`?env=particles`, `?env=objects`, `?env=galaxy` or `?env=globe` in the URL opens a world directly.
 
 ## Quick start
 

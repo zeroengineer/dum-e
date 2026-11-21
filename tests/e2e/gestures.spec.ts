@@ -1,5 +1,13 @@
 import { expect, test } from '@playwright/test';
-import { actionTypes, clearRecorded, control, feed, openWorld, watchErrors } from './helpers';
+import {
+  actionTypes,
+  clearRecorded,
+  control,
+  feed,
+  inspect,
+  openWorld,
+  watchErrors,
+} from './helpers';
 
 // Synthetic landmark frames go in ahead of the landmark processor, so smoothing, gesture
 // recognition, the event bus, the mapping tables and the environments are all the real thing.
@@ -147,6 +155,104 @@ test.describe('Galaxy Explorer', () => {
   });
 });
 
+test.describe('Holo Globe', () => {
+  const pair = (gap: number, y = 0.5) => [
+    { pose: 'relaxed' as const, x: 0.5 - gap / 2, y, handedness: 'Left' as const },
+    { pose: 'relaxed' as const, x: 0.5 + gap / 2, y, handedness: 'Right' as const },
+  ];
+
+  test('rides on one hand and stays where it is left', async ({ page }) => {
+    const errors = watchErrors(page);
+    await openWorld(page, 'globe');
+    expect(await inspect(page)).toMatchObject({ mode: 'free', x: 0, y: 0 });
+
+    // A hand low and left of centre. With no camera picture the image fills the screen, so
+    // image (0.3, 0.7) is device (-0.4, -0.4).
+    await feed(page, 12, [{ pose: 'relaxed', x: 0.3, y: 0.7 }]);
+    expect(await actionTypes(page)).toContain('anchor');
+    await expect.poll(async () => (await inspect(page)).mode).toBe('held');
+    await expect.poll(async () => (await inspect(page)).x as number).toBeLessThan(-0.35);
+    const held = await inspect(page);
+    expect(held.x as number).toBeGreaterThan(-0.47);
+    expect(held.y as number).toBeGreaterThan(-0.4); // above the palm
+    expect(held.y as number).toBeLessThan(0.3);
+
+    await feed(page, 14, []);
+    await expect.poll(async () => (await inspect(page)).mode).toBe('free');
+    await page.waitForTimeout(400);
+    const left = await inspect(page);
+    expect(left.x as number).toBeCloseTo(held.x as number, 1);
+    expect(left.y as number).toBeCloseTo(held.y as number, 1);
+    expect(errors).toEqual([]);
+  });
+
+  test('sits between two hands, follows the gap, and keeps the size they made', async ({
+    page,
+  }) => {
+    await openWorld(page, 'globe');
+    const start = (await inspect(page)).radius as number;
+
+    await feed(page, 12, pair(0.4, 0.4));
+    await expect.poll(async () => (await inspect(page)).mode).toBe('stretched');
+    await expect.poll(async () => (await inspect(page)).radius as number).toBeGreaterThan(start);
+    const narrow = await inspect(page);
+    expect(narrow.x as number).toBeCloseTo(0, 1);
+    expect(narrow.y as number).toBeCloseTo(0.2, 1); // image y 0.4 is device y 0.2
+
+    await feed(page, 14, (p) => pair(0.4 + p * 0.3, 0.4));
+    await feed(page, 4, pair(0.7, 0.4));
+    await expect
+      .poll(async () => (await inspect(page)).radius as number)
+      .toBeGreaterThan((narrow.radius as number) * 1.5);
+    const wide = (await inspect(page)).radius as number;
+
+    await feed(page, 14, []);
+    await expect.poll(async () => (await inspect(page)).mode).toBe('free');
+    await page.waitForTimeout(500);
+    expect((await inspect(page)).radius as number).toBeCloseTo(wide, 2);
+    expect(await control(page, 'size')).toBeCloseTo(wide, 2);
+    await expect(page.getByLabel('Size')).toHaveValue(/0\.\d+/);
+  });
+
+  test('pinch holds it still, fist folds it, open palm pulses, swipe changes its look', async ({
+    page,
+  }) => {
+    await openWorld(page, 'globe');
+    await feed(page, 10, [{ pose: 'pinch', x: 0.5, y: 0.6 }]);
+    await page.waitForTimeout(300);
+    const before = await inspect(page);
+    await feed(page, 10, (p) => [{ pose: 'pinch', x: 0.5 + p * 0.25, y: 0.6 }]);
+    expect(await actionTypes(page)).toContain('grab');
+    await page.waitForTimeout(200);
+    expect((await inspect(page)).x as number).toBeCloseTo(before.x as number, 1);
+
+    await feed(page, 12, [{ pose: 'fist', x: 0.5, y: 0.6 }]);
+    await expect.poll(async () => (await inspect(page)).collapse as number).toBeGreaterThan(0.6);
+    await feed(page, 12, [{ pose: 'open', x: 0.5, y: 0.6 }]);
+    expect(await actionTypes(page)).toContain('expand');
+    await expect.poll(async () => (await inspect(page)).collapse as number).toBeLessThan(0.3);
+
+    await feed(page, 14, []);
+    expect(await control(page, 'look')).toBe('earth');
+    await feed(page, 12, [{ pose: 'open', x: 0.7 }]);
+    await feed(page, 7, (p) => [{ pose: 'open', x: 0.7 - p * 0.4 }]);
+    expect(await control(page, 'look')).toBe('grid');
+    await expect(page.getByLabel('Look')).toHaveValue('grid');
+  });
+
+  test('draws fewer dots at lower quality without rebuilding', async ({ page }) => {
+    await openWorld(page, 'globe');
+    const dots = async () => (await inspect(page)).dots as number;
+    const initial = await dots();
+    await page.getByRole('button', { name: 'Settings' }).click();
+    await page.getByLabel('Quality').selectOption('high');
+    await expect.poll(dots).toBe(24000);
+    await page.getByLabel('Quality').selectOption('low');
+    await expect.poll(dots).toBe(7000);
+    expect(initial).toBeGreaterThan(0);
+  });
+});
+
 test('gestures follow the world that is on screen', async ({ page }) => {
   await openWorld(page, 'particles');
   await feed(page, 12, [{ pose: 'fist' }]);
@@ -167,7 +273,7 @@ test('switching worlds repeatedly stays healthy', async ({ page }) => {
   const errors = watchErrors(page);
   await openWorld(page, 'particles');
   for (let i = 0; i < 12; i++) {
-    await page.keyboard.press(String((i % 3) + 1));
+    await page.keyboard.press(String((i % 4) + 1));
     await page.waitForTimeout(120);
   }
   await page.keyboard.press('3');
