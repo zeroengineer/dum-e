@@ -119,10 +119,10 @@ function run(state: GlobeState, seconds: number): void {
 function hold(
   state: GlobeState,
   seconds: number,
-  hand: { slot?: 0 | 1; x: number; y: number; size?: number; roll?: number },
+  hand: { slot?: 0 | 1; x: number; y: number; size?: number },
 ): void {
   for (let i = 0; i < Math.round(seconds * 24); i++) {
-    state.setHand(hand.slot ?? 1, true, hand.x, hand.y, hand.size ?? 0.2, hand.roll ?? 0);
+    state.setHand(hand.slot ?? 1, true, hand.x, hand.y, hand.size ?? 0.2);
     run(state, 1 / 24);
   }
 }
@@ -153,14 +153,46 @@ describe('GlobeState: one hand', () => {
     expect(state.held).toBeGreaterThan(0.9);
   });
 
-  it('leans the way the fingers point', () => {
-    const upright = new GlobeState();
-    const tilted = new GlobeState();
-    hold(upright, 1, { x: 0, y: 0, roll: 0 });
-    hold(tilted, 1, { x: 0, y: 0, roll: Math.PI / 2 });
-    expect(upright.x).toBeCloseTo(0, 2);
-    expect(tilted.x).toBeGreaterThan(0.2); // clockwise quarter turn: fingers point right
-    expect(tilted.y).toBeCloseTo(0, 2);
+  it('rests on the palm: its lowest point sits at the palm, straight above it on screen', () => {
+    const state = new GlobeState();
+    state.setAspect(16 / 9);
+    hold(state, 1.5, { x: 0.2, y: -0.3 });
+    expect(state.x).toBeCloseTo(0.2, 2);
+    // Device y spans 2 for the screen's height, so a radius is `radius * 2` of it.
+    const bottom = state.y - state.radius * 2;
+    expect(bottom).toBeGreaterThan(-0.3 - 0.02);
+    expect(bottom).toBeLessThan(-0.3 + 0.12);
+  });
+
+  it('can be set to hover higher, or to sit centred on the palm', () => {
+    const state = new GlobeState();
+    hold(state, 1, { x: 0, y: 0 });
+    const resting = state.y;
+    state.setHover(2);
+    hold(state, 1, { x: 0, y: 0 });
+    expect(state.y).toBeGreaterThan(resting + state.radius);
+    state.setHover(0);
+    hold(state, 1, { x: 0, y: 0 });
+    expect(state.y).toBeCloseTo(0, 2);
+  });
+
+  it('does not pulse when the size reading jitters', () => {
+    const state = new GlobeState();
+    hold(state, 1, { x: 0, y: 0, size: 0.2 });
+    let smallest = Infinity;
+    let largest = 0;
+    for (let i = 0; i < 48; i++) {
+      // The reading flicks between two values a third apart, report to report.
+      state.setHand(1, true, 0, 0, i % 2 === 0 ? 0.2 : 0.15);
+      for (let f = 0; f < 3; f++) {
+        state.update(1 / 72);
+        if (i >= 24) {
+          smallest = Math.min(smallest, state.radius);
+          largest = Math.max(largest, state.radius);
+        }
+      }
+    }
+    expect(largest / smallest).toBeLessThan(1.04);
   });
 
   it('sits under the cursor for a mouse, which has no size', () => {
