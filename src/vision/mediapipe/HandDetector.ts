@@ -51,7 +51,8 @@ export function toRawHands(result: HandLandmarkerResult): RawHand[] {
     const handedness: HandId = category?.categoryName === 'Left' ? 'Left' : 'Right';
     hands.push({
       landmarks: landmarks.map((p) => ({ x: p.x, y: p.y, z: p.z })),
-      worldLandmarks: result.worldLandmarks?.[i]?.map((p) => ({ x: p.x, y: p.y, z: p.z })),
+      // MediaPipe also reports metric "world" landmarks. Nothing downstream reads them, so they
+      // are not copied; RawHand.worldLandmarks stays available to a detector that needs them.
       handedness,
       score: category?.score ?? 0,
     });
