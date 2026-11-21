@@ -1,6 +1,6 @@
 import { Engine } from '../core/engine/Engine';
 import type { Environment, EnvironmentId } from '../core/scene/Environment';
-import { isEnvironmentId, registerEnvironments } from '../environments';
+import { isEnvironmentId, preloadEnvironments, registerEnvironments } from '../environments';
 import { FallbackInput } from '../interaction/controllers/FallbackInput';
 import { InteractionController } from '../interaction/controllers/InteractionController';
 import { GestureEventBus } from '../interaction/dispatcher/GestureEventBus';
@@ -49,7 +49,11 @@ export class App {
     this.cleanups.push(
       syncGesturesToStore(this.bus),
       this.engine.events.on('fps', (fps) => store.setState({ fps })),
-      this.engine.events.on('quality', (resolvedQuality) => store.setState({ resolvedQuality })),
+      this.engine.events.on('quality', (resolvedQuality) => {
+        store.setState({ resolvedQuality });
+        // Styles can shed their own expensive effects on the low tier.
+        document.documentElement.dataset.quality = resolvedQuality;
+      }),
       this.engine.events.on('adapted', (adaptedQuality) => updateSettings({ adaptedQuality })),
       // Whatever environment is on screen is the one gestures act on.
       this.engine.events.on('environment', (environment) => {
@@ -86,6 +90,8 @@ export class App {
     );
 
     store.setState({ resolvedQuality: this.engine.currentQuality });
+    document.documentElement.dataset.quality = this.engine.currentQuality;
+    preloadEnvironments();
     this.engine.start();
     window.addEventListener('pagehide', this.onPageHide);
   }
@@ -97,20 +103,29 @@ export class App {
   // --- navigation ----------------------------------------------------------------------------
 
   showLanding(): void {
-    this.engine.setEnvironment(null);
+    this.show(null);
     store.setState({ screen: 'landing', environment: null });
   }
 
   showSelector(): void {
-    this.engine.setEnvironment(null);
+    this.show(null);
     store.setState({ screen: 'selector', environment: null, settingsOpen: false });
   }
 
   openEnvironment(id: EnvironmentId): void {
     if (store.getState().environment !== id || !this.engine.environment) {
-      this.engine.setEnvironment(id);
+      this.show(id);
     }
     store.setState({ screen: 'experience', environment: id });
+  }
+
+  /** Asks the engine for a world. It appears when its code and shaders are ready. */
+  private show(id: EnvironmentId | null): void {
+    this.engine.setEnvironment(id).catch((error: unknown) => {
+      // The world's code could not be fetched (offline, or a deploy replaced the files).
+      console.error(`[app] could not open "${String(id)}"`, error);
+      store.setState({ screen: 'selector', environment: null });
+    });
   }
 
   /** Opens the environment named in the URL (?env=galaxy), if any. */

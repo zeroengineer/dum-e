@@ -40,6 +40,11 @@ export class Starfield {
     this.points.renderOrder = -1;
   }
 
+  /** Draws only the first `count` stars. They are in random order, so any prefix is even. */
+  setDrawCount(count: number): void {
+    this.points.geometry.setDrawRange(0, Math.max(0, Math.floor(count)));
+  }
+
   update(dt: number): void {
     this.points.rotation.y += dt * 0.004;
     this.points.rotation.x += dt * 0.0015;

@@ -34,5 +34,9 @@ test.describe('performance readout', () => {
     expect(sample.drawCalls).toBeGreaterThanOrEqual(2);
     expect(sample.points).toBeGreaterThan(1000);
     expect(['low', 'medium', 'high']).toContain(sample.quality);
+    // Styles are told the tier too, so they can drop their own expensive effects on the lowest.
+    expect(await page.evaluate(() => document.documentElement.dataset.quality)).toBe(
+      sample.quality,
+    );
   });
 });

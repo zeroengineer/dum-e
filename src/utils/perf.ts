@@ -24,6 +24,20 @@ export function timed<T>(name: string, fn: () => T): T {
   }
 }
 
+/** `timed` for work that finishes later. The measure covers the wait as well as the work. */
+export async function timedAsync<T>(name: string, fn: () => Promise<T>): Promise<T> {
+  const start = performance.now();
+  try {
+    return await fn();
+  } finally {
+    try {
+      performance.measure(PREFIX + name, { start, end: performance.now() });
+    } catch {
+      // Timing is a diagnostic; it must never break the work it measures.
+    }
+  }
+}
+
 /** The latest measures recorded by `timed`, newest first. */
 export function recentMeasures(limit: number): Measure[] {
   const entries = performance.getEntriesByType('measure');

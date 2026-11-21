@@ -969,3 +969,19 @@
   margin: 0;
   overflow-wrap: anywhere;
 }
+
+/* --- low quality tier ------------------------------------------------------------------------ */
+
+/* Blurring what is behind a panel means re-blurring a moving 3D scene every frame. On machines
+   already at the lowest tier that is frame time better spent on the scene; panels go solid. */
+:root[data-quality='low'] #ui * {
+  backdrop-filter: none;
+}
+
+:root[data-quality='low'] .dialog::backdrop {
+  backdrop-filter: none;
+}
+
+:root[data-quality='low'] {
+  --glass: rgb(12 18 48 / 0.94);
+}
