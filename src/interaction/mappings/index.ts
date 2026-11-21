@@ -1,5 +1,6 @@
 import { GESTURES } from '../../gestures/events/types';
 import {
+  anchor,
   attract,
   expand,
   grab,
@@ -9,6 +10,7 @@ import {
   release,
   rotate,
   scale,
+  span,
   special,
   zoom,
 } from './rules';
@@ -63,11 +65,26 @@ export const galaxyMapping: GestureMapping = {
   [GESTURES.SWIPE]: next,
 };
 
+/**
+ * Holo Globe: the globe is in your hand, in the camera picture.
+ * It rides on a palm, stretches between two hands, spins when pinched, folds up in a fist,
+ * pulses from an open palm, and swipe changes its effect.
+ */
+export const globeMapping: GestureMapping = {
+  [GESTURES.HAND]: anchor,
+  [GESTURES.TWO_HAND]: span,
+  [GESTURES.PINCH]: grab,
+  [GESTURES.OPEN_PALM]: expand,
+  [GESTURES.FIST]: attract,
+  [GESTURES.SWIPE]: next,
+};
+
 /** Keyed by environment id. To make an environment react to a gesture, add a row to its table. */
 export const DEFAULT_MAPPINGS: Record<string, GestureMapping> = {
   particles: particlesMapping,
   objects: objectsMapping,
   galaxy: galaxyMapping,
+  globe: globeMapping,
 };
 
 export type { GestureMapping, GestureRule, MappingResult, Pointer } from './types';

@@ -38,6 +38,24 @@ Enforced by `no-restricted-imports` in [eslint.config.js](eslint.config.js):
 
 An environment therefore cannot tell whether an action came from a hand, a mouse or a test.
 
+## Worlds that draw the camera picture
+
+Most worlds only need to know roughly where a hand points, so their actions carry a pointer that
+is stretched (the middle of the camera image covers the whole screen) and clamped. A world that
+shows the camera picture itself needs the opposite: positions that land exactly on the hand in the
+picture. Two things reach such a world, and neither breaks the layer rules:
+
+- **The picture.** `App` passes the camera's `<video>` element to `Engine.setVideo` whenever the
+  camera comes on or goes off; the engine puts it in `EnvironmentContext.video` and calls the
+  optional `Environment.setVideo`. The element is a DOM type, so no rendering code imports
+  `vision`. It is for display only.
+- **The hands.** The `anchor` and `span` actions carry positions in the mirrored camera image
+  (`space: 'image'`, u right and v down, 0..1), unstretched, with palm size, roll, fingertips and
+  the gap between two palms. The world fits the image to the screen itself with
+  `src/core/camera/videoFit.ts`, using the same fit for the picture and for the positions, then
+  places them in the scene with `ndcToPlane`. Mouse input uses the same actions with
+  `space: 'screen'`.
+
 ## Key contracts
 
 | Type                | File                                | Meaning                                           |

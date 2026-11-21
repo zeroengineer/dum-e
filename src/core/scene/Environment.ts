@@ -12,6 +12,8 @@ export interface EnvironmentContext {
   maxPointSize: number;
   /** Requested particle budget, or undefined to use the quality default. */
   particleCount?: number;
+  /** The live camera picture, or null while the camera is off. */
+  video: HTMLVideoElement | null;
 }
 
 /** A user-adjustable parameter. The UI renders these without knowing what the environment is. */
@@ -48,6 +50,11 @@ export interface Environment {
   resize(aspect: number): void;
   reset(): void;
   setQuality(quality: QualityLevel, pixelRatio: number): void;
+  /**
+   * The camera came on (a playing video element) or went off (null). Only worlds that draw the
+   * camera picture implement this. The element is for display; hand positions arrive as actions.
+   */
+  setVideo?(video: HTMLVideoElement | null): void;
   getControls(): ControlSpec[];
   setControl(id: string, value: ControlValue): void;
   /** Fires when control values change from inside the environment (for example a swipe changed a preset). */

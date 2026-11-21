@@ -77,6 +77,38 @@ const spread =
 export const scale = spread('scale');
 export const zoom = spread('zoom');
 
+const anchorSpace = (e: { source: 'camera' | 'fallback' }): 'image' | 'screen' =>
+  e.source === 'camera' ? 'image' : 'screen';
+
+/**
+ * Where the hand is in the camera picture. Deliberately not the stretched pointer: a world that
+ * draws the camera image has to put things exactly on the hand.
+ */
+export const anchor: GestureRule = (e, p) => ({
+  type: 'anchor',
+  phase: e.phase,
+  hand: p.hand,
+  space: anchorSpace(e),
+  u: e.x,
+  v: e.y,
+  size: e.size,
+  roll: e.roll,
+  ...(e.tips ? { tips: e.tips } : null),
+});
+
+/** Both hands as a place and a width, for something held between them. */
+export const span: GestureRule = (e) => ({
+  type: 'span',
+  phase: e.phase,
+  hand: 0,
+  space: anchorSpace(e),
+  u: e.x,
+  v: e.y,
+  gap: e.span,
+  scale: e.scale,
+  factor: Number.isFinite(e.dScale) && e.dScale > 0 ? e.dScale : 1,
+});
+
 /** Swiping left or up moves on to the next item, like turning a page; right or down goes back. */
 const SWIPE_STEP: Record<SwipeDirection, 1 | -1> = { left: 1, up: 1, right: -1, down: -1 };
 

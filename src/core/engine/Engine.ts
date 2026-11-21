@@ -67,6 +67,7 @@ export class Engine {
   private quality: QualityLevel;
   private particleBudget = 0;
   private adaptationPausedUntil = 0;
+  private video: HTMLVideoElement | null = null;
   private profiling = false;
   /** About two seconds of frames at 60 fps. */
   private readonly frameTimes = new SampleWindow(120);
@@ -119,6 +120,13 @@ export class Engine {
     this.particleBudget = count;
   }
 
+  /** Hands the live camera picture to worlds that draw it; null when the camera is off. */
+  setVideo(video: HTMLVideoElement | null): void {
+    if (video === this.video) return;
+    this.video = video;
+    this.scenes.current?.setVideo?.(video);
+  }
+
   /**
    * Ignore slow frames for a while. Used around known one-off stalls (loading the hand model),
    * which say nothing about how fast the scene itself renders.
@@ -165,6 +173,7 @@ export class Engine {
       aspect: this.renderer.aspect,
       maxPointSize: this.renderer.maxPointSize,
       particleCount: this.particleBudget > 0 ? this.particleBudget : undefined,
+      video: this.video,
     };
   }
 

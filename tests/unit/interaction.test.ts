@@ -10,6 +10,7 @@ import { GestureEventBus } from '../../src/interaction/dispatcher/GestureEventBu
 import {
   DEFAULT_MAPPINGS,
   galaxyMapping,
+  globeMapping,
   objectsMapping,
   particlesMapping,
 } from '../../src/interaction/mappings';
@@ -183,6 +184,103 @@ describe('galaxy mapping', () => {
     expect(
       types(map(galaxyMapping, event(GESTURES.SWIPE, 'start', { direction: 'right' }))),
     ).toEqual(['next']);
+  });
+});
+
+describe('globe mapping', () => {
+  it('reports a tracked hand where it is in the camera image, not stretched to the screen', () => {
+    const tips = [0, 1, 2, 3, 4].map((i) => ({ x: 0.1 * i, y: 0.2 }));
+    const e = event(GESTURES.HAND, 'update', { x: 0.1, y: 0.8, size: 0.21, roll: 0.4, tips });
+    const result = globeMapping[GESTURES.HAND]?.(e, toPointer(e, 0.8));
+    expect(result).toEqual({
+      type: 'anchor',
+      phase: 'update',
+      hand: 1,
+      space: 'image',
+      u: 0.1,
+      v: 0.8,
+      size: 0.21,
+      roll: 0.4,
+      tips,
+    });
+  });
+
+  it('says when a hand arrives and leaves', () => {
+    const left = { hand: 'Left' as const };
+    expect(map(globeMapping, event(GESTURES.HAND, 'start', left))[0]).toMatchObject({
+      type: 'anchor',
+      phase: 'start',
+      hand: 0,
+    });
+    expect(map(globeMapping, event(GESTURES.HAND, 'end', left))[0]).toMatchObject({
+      type: 'anchor',
+      phase: 'end',
+      hand: 0,
+    });
+  });
+
+  it('reports the mouse in screen space', () => {
+    const e = event(GESTURES.HAND, 'update', { x: 0.25, y: 0.75, source: 'fallback' });
+    expect(map(globeMapping, e)).toEqual([
+      {
+        type: 'anchor',
+        phase: 'update',
+        hand: 1,
+        space: 'screen',
+        u: 0.25,
+        v: 0.75,
+        size: 0,
+        roll: 0,
+      },
+    ]);
+  });
+
+  it('reports two hands as a span from start to end, with the gap between the palms', () => {
+    const both = { hand: 'Both' as const, x: 0.5, y: 0.4 };
+    expect(map(globeMapping, event(GESTURES.TWO_HAND, 'start', { ...both, span: 0.5 }))).toEqual([
+      {
+        type: 'span',
+        phase: 'start',
+        hand: 0,
+        space: 'image',
+        u: 0.5,
+        v: 0.4,
+        gap: 0.5,
+        scale: 1,
+        factor: 1,
+      },
+    ]);
+    const update = map(
+      globeMapping,
+      event(GESTURES.TWO_HAND, 'update', { ...both, span: 0.6, scale: 1.2, dScale: 1.2 }),
+    )[0];
+    expect(update).toMatchObject({ type: 'span', phase: 'update', gap: 0.6, scale: 1.2 });
+    expect(update.type === 'span' && update.factor).toBeCloseTo(1.2);
+    // Unlike zoom and scale, a still pair of hands is still reported: the globe sits between them.
+    expect(types(map(globeMapping, event(GESTURES.TWO_HAND, 'update', both)))).toEqual(['span']);
+    expect(types(map(globeMapping, event(GESTURES.TWO_HAND, 'end', both)))).toEqual(['span']);
+  });
+
+  it('never passes on an unusable resize step', () => {
+    for (const dScale of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
+      const action = map(globeMapping, event(GESTURES.TWO_HAND, 'update', { dScale }))[0];
+      expect(action.type === 'span' && action.factor).toBe(1);
+    }
+  });
+
+  it('gives the mouse wheel a span with no gap, so only the step applies', () => {
+    const wheel = event(GESTURES.TWO_HAND, 'update', { source: 'fallback', dScale: 1.1 });
+    expect(map(globeMapping, wheel)[0]).toMatchObject({ space: 'screen', gap: 0, factor: 1.1 });
+  });
+
+  it('maps poses and swipe', () => {
+    expect(types(map(globeMapping, event(GESTURES.OPEN_PALM)))).toEqual(['expand']);
+    expect(types(map(globeMapping, event(GESTURES.FIST)))).toEqual(['attract']);
+    expect(types(map(globeMapping, event(GESTURES.PINCH)))).toEqual(['grab']);
+    expect(types(map(globeMapping, event(GESTURES.SWIPE, 'start', { direction: 'left' })))).toEqual(
+      ['next'],
+    );
+    expect(DEFAULT_MAPPINGS.globe).toBe(globeMapping);
   });
 });
 

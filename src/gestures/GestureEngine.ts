@@ -1,4 +1,5 @@
 import { wrapAngle } from '../utils/math';
+import { LM } from '../vision/landmarks/types';
 import type { HandFrame, HandId, TrackingFrame } from '../vision/landmarks/types';
 import { GESTURES, createGestureEvent } from './events/types';
 import type {
@@ -65,10 +66,11 @@ interface TwoHandTrack extends Tracked {
   /** Distance at the last reported change; small wobbles around it are ignored. */
   reportedDistance: number;
   lastSeen: number;
-  last: { x: number; y: number; scale: number } | null;
+  last: { x: number; y: number; scale: number; span: number } | null;
 }
 
 const HAND_IDS: readonly HandId[] = ['Left', 'Right'];
+const FINGERTIPS = [LM.THUMB_TIP, LM.INDEX_TIP, LM.MIDDLE_TIP, LM.RING_TIP, LM.PINKY_TIP] as const;
 
 /**
  * Watches processed hand frames and reports gestures as start / update / end events.
@@ -323,6 +325,11 @@ export class GestureEngine {
       roll: frame.roll,
       dRoll: anchor ? wrapAngle(frame.roll - anchor.roll) : 0,
       size: frame.size,
+      // Only the presence event carries fingertips; poses would repeat the same points.
+      tips:
+        gesture === GESTURES.HAND && phase !== 'end'
+          ? FINGERTIPS.map((i) => ({ x: frame.landmarks[i].x, y: frame.landmarks[i].y }))
+          : undefined,
       direction,
       source: 'camera',
     });
@@ -386,12 +393,13 @@ export class GestureEngine {
           dy: anchor ? y - anchor.y : 0,
           scale,
           dScale,
+          span: result.distance,
           size: (left.size + right.size) / 2,
           source: 'camera',
         }),
       );
       tracked.anchor = { x, y, roll: 0 };
-      tracked.last = { x, y, scale };
+      tracked.last = { x, y, scale, span: result.distance };
     }
   }
 
@@ -403,7 +411,7 @@ export class GestureEngine {
 
   private finishTwoHand(name: GestureName, tracked: TwoHandTrack, now: number): void {
     tracked.machine.forceEnd(now);
-    const last = tracked.last ?? { x: 0.5, y: 0.5, scale: 1 };
+    const last = tracked.last ?? { x: 0.5, y: 0.5, scale: 1, span: 0 };
     this.sink(
       createGestureEvent({
         gesture: name,
@@ -414,6 +422,7 @@ export class GestureEngine {
         x: last.x,
         y: last.y,
         scale: last.scale,
+        span: last.span,
         source: 'camera',
       }),
     );
