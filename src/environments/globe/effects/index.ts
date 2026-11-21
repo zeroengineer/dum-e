@@ -1,4 +1,5 @@
 import { createExplodeEffect } from './explode';
+import { createPlasmaEffect } from './plasma';
 import { createScanEffect } from './scan';
 import type { GlobeEffectInfo } from './types';
 
@@ -6,6 +7,7 @@ import type { GlobeEffectInfo } from './types';
 export const GLOBE_EFFECTS = {
   scan: { label: 'Hologram scan', create: createScanEffect },
   explode: { label: 'Explode and reassemble', create: createExplodeEffect },
+  plasma: { label: 'Energy and plasma', create: createPlasmaEffect },
 } as const satisfies Record<string, GlobeEffectInfo>;
 
 export type GlobeEffectName = keyof typeof GLOBE_EFFECTS;

@@ -265,6 +265,25 @@ test.describe('Holo Globe', () => {
     await expect.poll(explode).toBeLessThan(0.05);
   });
 
+  test('plasma: arcs jump to the fingertips of hands held beside the globe', async ({ page }) => {
+    const errors = watchErrors(page);
+    await openWorld(page, 'globe');
+    await page.getByLabel('Effect').selectOption('plasma');
+    const arcs = async () => (await inspect(page)).arcs as number;
+    expect(await arcs()).toBe(0); // no hands, nothing to reach for
+
+    // Two open hands with the globe between them: all ten fingertips are just outside it.
+    await feed(page, 16, [
+      { pose: 'open', x: 0.25, y: 0.5, handedness: 'Left' },
+      { pose: 'open', x: 0.75, y: 0.5, handedness: 'Right' },
+    ]);
+    await expect.poll(arcs).toBeGreaterThanOrEqual(6);
+
+    await feed(page, 14, []);
+    await expect.poll(arcs).toBe(0);
+    expect(errors).toEqual([]);
+  });
+
   test('draws fewer dots at lower quality without rebuilding', async ({ page }) => {
     await openWorld(page, 'globe');
     const dots = async () => (await inspect(page)).dots as number;

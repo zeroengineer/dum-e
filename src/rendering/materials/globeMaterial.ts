@@ -1,11 +1,15 @@
-import { AdditiveBlending, Color, DoubleSide, FrontSide, ShaderMaterial } from 'three';
+import { AdditiveBlending, Color, DoubleSide, FrontSide, ShaderMaterial, Vector3 } from 'three';
 import {
+  globeArcsFragmentShader,
+  globeArcsVertexShader,
   globeDotsFragmentShader,
   globeDotsVertexShader,
   globeHaloFragmentShader,
   globeHaloVertexShader,
   globeLinesFragmentShader,
   globeLinesVertexShader,
+  globePlasmaFragmentShader,
+  globePlasmaVertexShader,
   globeShellFragmentShader,
   globeShellVertexShader,
 } from '../shaders/globe';
@@ -95,6 +99,39 @@ export function createGlobeHaloMaterial(): ShaderMaterial {
       uGlow: { value: 1 },
       uPulse: { value: 0 },
       uEdge: { value: 0.35 },
+    },
+  });
+}
+
+export function createGlobePlasmaMaterial(): ShaderMaterial {
+  return new ShaderMaterial({
+    ...LIGHT,
+    side: FrontSide,
+    vertexShader: globePlasmaVertexShader,
+    fragmentShader: globePlasmaFragmentShader,
+    uniforms: {
+      uTime: { value: 0 },
+      uStrength: { value: 0 },
+      uPulse: { value: 0 },
+      uBoost: { value: 1 },
+      uColor: { value: new Color() },
+      uAccent: { value: new Color() },
+    },
+  });
+}
+
+/** `tips` is how many fingertips the arcs reach for; the shader is written for ten. */
+export function createGlobeArcsMaterial(tips: number): ShaderMaterial {
+  return new ShaderMaterial({
+    ...LIGHT,
+    vertexShader: globeArcsVertexShader,
+    fragmentShader: globeArcsFragmentShader,
+    uniforms: {
+      uTips: { value: Array.from({ length: tips }, () => new Vector3()) },
+      uTipOn: { value: new Array<number>(tips).fill(0) },
+      uTime: { value: 0 },
+      uStrength: { value: 0 },
+      uColor: { value: new Color() },
     },
   });
 }

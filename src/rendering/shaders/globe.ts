@@ -250,3 +250,132 @@ void main() {
   #include <colorspace_fragment>
 }
 `;
+
+export const globePlasmaVertexShader = /* glsl */ `
+varying vec3 vPosition;
+varying vec3 vNormal;
+varying vec3 vView;
+
+void main() {
+  vPosition = position;
+  vec4 mv = modelViewMatrix * vec4(position, 1.0);
+  gl_Position = projectionMatrix * mv;
+  vNormal = normalize(normalMatrix * normal);
+  vView = normalize(-mv.xyz);
+}
+`;
+
+export const globePlasmaFragmentShader = /* glsl */ `
+uniform float uTime;
+uniform float uStrength;
+uniform float uPulse;
+uniform float uBoost;
+uniform vec3 uColor;
+uniform vec3 uAccent;
+varying vec3 vPosition;
+varying vec3 vNormal;
+varying vec3 vView;
+
+float hash(vec3 p) {
+  p = fract(p * 0.3183099 + 0.1);
+  p *= 17.0;
+  return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
+}
+
+float noise(vec3 x) {
+  vec3 i = floor(x);
+  vec3 f = fract(x);
+  f = f * f * (3.0 - 2.0 * f);
+  return mix(
+    mix(mix(hash(i), hash(i + vec3(1, 0, 0)), f.x),
+        mix(hash(i + vec3(0, 1, 0)), hash(i + vec3(1, 1, 0)), f.x), f.y),
+    mix(mix(hash(i + vec3(0, 0, 1)), hash(i + vec3(1, 0, 1)), f.x),
+        mix(hash(i + vec3(0, 1, 1)), hash(i + vec3(1, 1, 1)), f.x), f.y),
+    f.z);
+}
+
+float fbm(vec3 p) {
+  float amplitude = 0.5;
+  float sum = 0.0;
+  for (int i = 0; i < 3; i++) {
+    sum += amplitude * noise(p);
+    p = p * 2.03 + vec3(1.7, 9.2, 3.1);
+    amplitude *= 0.5;
+  }
+  return sum;
+}
+
+void main() {
+  if (uStrength <= 0.0) discard;
+  // One field of noise pushes another around, so the surface churns instead of sliding.
+  vec3 p = vPosition * 2.4;
+  float flow = fbm(p + vec3(0.0, uTime * 0.35, uTime * 0.2));
+  float n = fbm(p * 1.3 + flow * 1.6 - vec3(uTime * 0.15));
+  // Where the noise crosses its middle value there is a thin bright vein.
+  float vein = pow(1.0 - abs(2.0 * n - 1.0), 7.0);
+  float cloud = smoothstep(0.4, 0.85, n) * 0.3;
+  float rim = pow(1.0 - clamp(dot(normalize(vNormal), normalize(vView)), 0.0, 1.0), 1.5);
+
+  // A pulse is a ring of light running from the top of the globe to the bottom.
+  float latitude = acos(clamp(normalize(vPosition).y, -1.0, 1.0)) / 3.14159265;
+  float ripple = smoothstep(0.09, 0.0, abs(latitude - (1.0 - uPulse))) * uPulse * 2.2;
+
+  float energy = (vein * 1.4 + cloud) * (0.4 + 0.95 * rim) + ripple;
+  float strength = energy * uStrength * uBoost;
+  gl_FragColor = vec4(mix(uColor, uAccent, clamp(vein * 0.75 + ripple * 0.5, 0.0, 1.0)) * strength, strength);
+  #include <colorspace_fragment>
+}
+`;
+
+/** Ten arcs: one per fingertip, from the nearest point of the globe's surface out to the tip. */
+export const globeArcsVertexShader = /* glsl */ `
+/** Fingertips relative to the globe's centre, in globe radii. */
+uniform vec3 uTips[10];
+uniform float uTipOn[10];
+uniform float uTime;
+uniform float uStrength;
+
+attribute float aArc;
+attribute float aAlong;
+attribute float aStrand;
+
+varying float vAlpha;
+
+float hash(vec2 p) {
+  return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+}
+
+void main() {
+  int index = int(aArc + 0.5);
+  vec3 tip = uTips[index];
+  float distance = max(length(tip), 0.0001);
+  vec3 outward = tip / distance;
+  vec3 p = mix(outward, tip, aAlong);
+
+  // Lightning is redrawn many times a second, each time with a new kink at every joint.
+  vec3 side = normalize(cross(outward, vec3(0.0, 0.0, 1.0)) + vec3(0.0001));
+  vec3 lift = cross(outward, side);
+  float tick = floor(uTime * 16.0) + aStrand * 7.0;
+  float kinkSide = hash(vec2(aArc * 3.7 + tick, aAlong * 31.0)) - 0.5;
+  float kinkLift = hash(vec2(aArc * 5.3 + tick * 1.3, aAlong * 17.0)) - 0.5;
+  float bow = sin(aAlong * 3.14159265);
+  p += (side * kinkSide + lift * kinkLift) * bow * (0.05 + 0.09 * max(distance - 1.0, 0.0));
+
+  // No arc to a fingertip inside the globe or too far to reach; arcs also come and go.
+  float reach = smoothstep(1.03, 1.2, distance) * (1.0 - smoothstep(2.4, 3.4, distance));
+  float alive = step(0.3, hash(vec2(aArc * 9.1 + aStrand, floor(uTime * 7.0))));
+  vAlpha = uTipOn[index] * reach * alive * uStrength;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+}
+`;
+
+export const globeArcsFragmentShader = /* glsl */ `
+uniform vec3 uColor;
+varying float vAlpha;
+
+void main() {
+  if (vAlpha <= 0.001) discard;
+  gl_FragColor = vec4(uColor * 1.7, vAlpha);
+  #include <colorspace_fragment>
+}
+`;
