@@ -45,7 +45,8 @@ through the pipeline, not to relax the rule.
 ## Git workflow
 
 - `main` always builds. Every feature is developed on its own `feature/<name>` branch, pushed, and
-  merged into `main` with a merge commit (`--no-ff`).
+  merged into `main` with a merge commit (`--no-ff`). Once merged, the branch is deleted locally
+  and on `origin`.
 - Conventional Commits: `feat:`, `fix:`, `chore:`, `docs:`, `test:`, `refactor:`, `perf:`.
 - No force pushes. No secrets, recordings, `node_modules` or build output in the repository.
 
@@ -78,3 +79,25 @@ landmark frames ahead of the landmark processor through the `window.__DUME__` te
 (`src/app/testHook.ts`), which is only installed when the URL contains `?e2e=1`. That covers
 everything downstream of MediaPipe. Real-hand detection has to be checked by a person at a
 webcam; see the checklist in [GESTURE_CONTROLS.md](GESTURE_CONTROLS.md).
+
+## Measuring performance
+
+Add `?perf=1` to the URL for a readout over the scene (`src/ui/components/PerfOverlay.ts`):
+
+- **Frame time**: median, 95th percentile and worst of the last two seconds. The frame rate pill
+  in the top bar hides stutter; the 95th percentile does not.
+- **Main thread**: time spent updating and submitting each frame. It excludes GPU time, so a
+  scene can be slow with this number small; that points at fill rate, not JavaScript.
+- **Drawn**: draw calls, points and triangles in the last frame.
+- **Quality**: the active tier and pixel ratio.
+- **Tracking**: detections per second, how long each detection blocks the main thread, and
+  whether inference runs on the GPU or CPU.
+- **Recent stalls**: one-off pauses wrapped in `timed()` (`src/utils/perf.ts`), such as switching
+  worlds and rebuilding buffers. They are also User Timing measures named `dum-e:*`, so they show
+  in the Performance panel of the browser's developer tools.
+
+Wrap any new one-off heavy step in `timed('world:step', () => …)`. Scripts can read the same
+numbers with `window.__DUME__.perf()` when the page is opened with `?e2e=1`.
+
+A frame rate at the display's refresh rate only says the machine keeps up. Compare changes on a
+machine that does not, or compare main-thread time and stalls.

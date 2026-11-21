@@ -25,6 +25,8 @@ interface SessionEvents {
   /** Processed hands for every analysed video frame, including frames with no hands. */
   frame: TrackingFrame;
   rate: number;
+  /** Mean main-thread time per detection, in milliseconds. */
+  detectMs: number;
   devices: CameraDeviceInfo[];
 }
 
@@ -64,6 +66,7 @@ export class TrackingSession {
 
     this.tracker.subscribe(this.onRawFrame);
     this.tracker.events.on('rate', (rate) => this.events.emit('rate', rate));
+    this.tracker.events.on('detectMs', (ms) => this.events.emit('detectMs', ms));
     this.tracker.events.on('error', () =>
       this.fail({ state: 'tracker-failed', message: TRACKER_FAILED }),
     );

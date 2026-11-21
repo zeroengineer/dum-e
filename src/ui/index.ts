@@ -2,6 +2,7 @@ import '../styles/ui.css';
 import type { App } from '../app/App';
 import { ENVIRONMENTS } from '../environments';
 import { store, watch } from '../state/store';
+import { createPerfOverlay } from './components/PerfOverlay';
 import type { Screen } from '../state/store';
 import { createHud } from './screens/Hud';
 import { createLanding } from './screens/Landing';
@@ -14,13 +15,19 @@ function isTyping(target: EventTarget | null): boolean {
 }
 
 /** Builds the interface inside `root` and keeps it in step with the store. */
-export function mountUi(app: App, root: HTMLElement): () => void {
+export function mountUi(
+  app: App,
+  root: HTMLElement,
+  options: { perfOverlay?: boolean } = {},
+): () => void {
   const landing = createLanding(app);
   const selector = createSelector(app);
   const hud = createHud(app);
   const settings = createSettingsPanel(app);
   const tutorial = createTutorial(app);
   root.append(landing.element, selector.element, hud.element, settings.element, tutorial.element);
+  const perf = options.perfOverlay ? createPerfOverlay(app) : null;
+  if (perf) root.append(perf.element);
 
   const screens: Record<Screen, HTMLElement> = {
     landing: landing.element,
@@ -64,7 +71,7 @@ export function mountUi(app: App, root: HTMLElement): () => void {
   return () => {
     window.removeEventListener('keydown', onKeyDown);
     offScreen();
-    for (const part of [landing, selector, hud, settings, tutorial]) {
+    for (const part of [landing, selector, hud, settings, tutorial, ...(perf ? [perf] : [])]) {
       part.dispose();
       part.element.remove();
     }

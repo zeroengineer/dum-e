@@ -9,6 +9,7 @@ export type TrackerState = 'idle' | 'loading' | 'ready' | 'running' | 'failed';
 interface HandTrackerEvents {
   state: TrackerState;
   rate: number;
+  detectMs: number;
   error: Error;
 }
 
@@ -30,6 +31,7 @@ export class HandTracker implements LandmarkSource {
   ) {
     this.loop = new TrackingLoop(hz);
     this.loop.events.on('rate', (rate) => this.events.emit('rate', rate));
+    this.loop.events.on('detectMs', (ms) => this.events.emit('detectMs', ms));
     this.loop.events.on('error', (error) => {
       this.setState('failed');
       this.events.emit('error', error);

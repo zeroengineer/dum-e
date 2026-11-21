@@ -1,3 +1,4 @@
+import type { PerfSample } from '../core/engine/Engine';
 import type { GestureEvent } from '../gestures/events/types';
 import type { EnvironmentAction } from '../interaction/actions';
 import { store } from '../state/store';
@@ -16,6 +17,8 @@ export interface DumeTestHook {
   clear(): void;
   /** Read-only facts about the scene for assertions. */
   scene(): { environment: string | null; controls: Record<string, unknown>; videoLive: boolean };
+  /** The latest profiling readout, or null before the first one. */
+  perf(): (PerfSample & { fps: number; detectMs: number | null }) | null;
 }
 
 declare global {
@@ -39,6 +42,12 @@ export function installTestHook(app: App): DumeTestHook {
   app.bus.subscribe((event) => record(events, event));
   app.controller.onAction((action) => record(actions, action));
 
+  let sample: PerfSample | null = null;
+  let detectMs: number | null = null;
+  app.engine.setProfiling(true);
+  app.engine.events.on('perf', (next) => (sample = next));
+  app.session.events.on('detectMs', (ms) => (detectMs = ms));
+
   const hook: DumeTestHook = {
     inject: (frame) => app.session.inject(frame),
     state: () => store.getState(),
@@ -48,6 +57,7 @@ export function installTestHook(app: App): DumeTestHook {
       events.length = 0;
       actions.length = 0;
     },
+    perf: () => (sample ? { ...sample, fps: store.getState().fps, detectMs } : null),
     scene: () => {
       const environment = app.environment;
       const controls: Record<string, unknown> = {};

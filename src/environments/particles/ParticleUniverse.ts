@@ -8,6 +8,7 @@ import type { EnvironmentAction } from '../../interaction/actions';
 import { Starfield } from '../../rendering/effects/Starfield';
 import { createParticleMaterial } from '../../rendering/materials/particleMaterial';
 import { clamp, damp } from '../../utils/math';
+import { timed } from '../../utils/perf';
 import { createRng } from '../../utils/rng';
 import {
   FORMATIONS,
@@ -406,6 +407,10 @@ export class ParticleUniverse extends BaseEnvironment {
   private rebuild(requested: number): void {
     const count = Math.round(clamp(requested, COUNT_MIN, COUNT_MAX));
     if (count === this.count && this.points) return;
+    timed('particles:rebuild', () => this.allocate(count));
+  }
+
+  private allocate(count: number): void {
     const rotation = this.points?.rotation.y ?? 0;
     if (this.points) {
       this.resources.release(this.points.geometry);

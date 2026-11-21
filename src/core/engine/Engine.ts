@@ -1,6 +1,8 @@
 import { PerspectiveCamera, Scene } from 'three';
 import { Starfield } from '../../rendering/effects/Starfield';
 import { Emitter } from '../../utils/emitter';
+import { timed } from '../../utils/perf';
+import { SampleWindow } from '../../utils/stats';
 import { RendererManager } from '../renderer/RendererManager';
 import type {
   Environment,
@@ -12,9 +14,27 @@ import type {
 import { SceneManager } from '../scene/SceneManager';
 import { QUALITY_PROFILES, guessQuality, lowerQuality } from './quality';
 
+/** A profiling readout, published about twice a second while profiling is on. */
+export interface PerfSample {
+  /** Time between frames in milliseconds: the median and the slow tail. */
+  frameP50: number;
+  frameP95: number;
+  frameMax: number;
+  /** Main-thread time spent updating and submitting a frame, in milliseconds. */
+  workMean: number;
+  workP95: number;
+  drawCalls: number;
+  points: number;
+  triangles: number;
+  lines: number;
+  pixelRatio: number;
+  quality: QualityLevel;
+}
+
 interface EngineEvents {
   /** Smoothed frames per second, about twice a second. */
   fps: number;
+  perf: PerfSample;
   quality: QualityLevel;
   environment: Environment | null;
 }
@@ -47,6 +67,10 @@ export class Engine {
   private quality: QualityLevel;
   private particleBudget = 0;
   private adaptationPausedUntil = 0;
+  private profiling = false;
+  /** About two seconds of frames at 60 fps. */
+  private readonly frameTimes = new SampleWindow(120);
+  private readonly workTimes = new SampleWindow(120);
 
   constructor(canvas: HTMLCanvasElement) {
     this.renderer = new RendererManager(canvas);
@@ -77,7 +101,9 @@ export class Engine {
   }
 
   setEnvironment(id: EnvironmentId | null): Environment | null {
-    const environment = this.scenes.activate(id, this.context());
+    const environment = timed(`activate:${id ?? 'none'}`, () =>
+      this.scenes.activate(id, this.context()),
+    );
     this.lowFpsSeconds = 0;
     this.events.emit('environment', environment);
     return environment;
@@ -100,6 +126,13 @@ export class Engine {
   pauseQualityAdaptation(ms: number): void {
     this.adaptationPausedUntil = performance.now() + ms;
     this.lowFpsSeconds = 0;
+  }
+
+  /** Collects frame timings and render counts and publishes them as `perf` events. */
+  setProfiling(on: boolean): void {
+    this.profiling = on;
+    this.frameTimes.clear();
+    this.workTimes.clear();
   }
 
   start(): void {
@@ -147,8 +180,10 @@ export class Engine {
   private readonly frame = (now: number): void => {
     if (!this.running) return;
     this.rafId = requestAnimationFrame(this.frame);
-    const dt = Math.min((now - this.lastTime) / 1000, MAX_DT);
+    const interval = now - this.lastTime;
+    const dt = Math.min(interval / 1000, MAX_DT);
     this.lastTime = now;
+    const workStart = this.profiling ? performance.now() : 0;
     this.elapsed += dt;
 
     const environment = this.scenes.current;
@@ -158,6 +193,10 @@ export class Engine {
     } else {
       this.backdrop.update(dt * 6);
       this.renderer.render(this.backdropScene, this.backdropCamera);
+    }
+    if (this.profiling) {
+      this.frameTimes.push(interval);
+      this.workTimes.push(performance.now() - workStart);
     }
     this.measure(now);
   };
@@ -170,6 +209,7 @@ export class Engine {
     this.frames = 0;
     this.fpsWindowStart = now;
     this.events.emit('fps', fps);
+    if (this.profiling) this.emitPerf();
 
     if (this.qualityPreference !== 'auto' || this.quality === 'low') return;
     if (now < this.adaptationPausedUntil) {
@@ -180,6 +220,19 @@ export class Engine {
     if (this.lowFpsSeconds >= LOW_FPS_SECONDS) this.applyQuality(lowerQuality(this.quality));
   }
 
+  private emitPerf(): void {
+    this.events.emit('perf', {
+      frameP50: this.frameTimes.percentile(0.5),
+      frameP95: this.frameTimes.percentile(0.95),
+      frameMax: this.frameTimes.max(),
+      workMean: this.workTimes.mean(),
+      workP95: this.workTimes.percentile(0.95),
+      ...this.renderer.stats(),
+      pixelRatio: this.renderer.pixelRatio,
+      quality: this.quality,
+    });
+  }
+
   /** A hidden tab gets no animation frames worth rendering; stop asking for them. */
   private readonly onVisibility = (): void => {
     if (document.hidden) {
@@ -188,6 +241,9 @@ export class Engine {
       this.lastTime = performance.now();
       this.fpsWindowStart = this.lastTime;
       this.frames = 0;
+      // The gap while hidden is not a slow frame.
+      this.frameTimes.clear();
+      this.workTimes.clear();
       cancelAnimationFrame(this.rafId);
       this.rafId = requestAnimationFrame(this.frame);
     }
