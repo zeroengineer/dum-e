@@ -434,3 +434,37 @@ describe('hologram scan', () => {
     expect(lowest).toBeLessThan(0.95);
   });
 });
+
+describe('explode and reassemble', () => {
+  it('leaves the globe whole at ordinary sizes and fully apart when stretched wide', async () => {
+    const { explodeTarget, EXPLODE_START, EXPLODE_FULL } =
+      await import('../../src/environments/globe/effects/explode');
+    expect(explodeTarget(GLOBE_RADIUS_DEFAULT)).toBe(0);
+    expect(explodeTarget(EXPLODE_START)).toBe(0);
+    expect(explodeTarget((EXPLODE_START + EXPLODE_FULL) / 2)).toBeCloseTo(0.5);
+    expect(explodeTarget(EXPLODE_FULL)).toBe(1);
+    expect(explodeTarget(GLOBE_RADIUS_MAX)).toBe(1);
+    // The hands can reach it: the largest globe is past the point of coming fully apart.
+    expect(GLOBE_RADIUS_MAX).toBeGreaterThan(EXPLODE_FULL);
+  });
+
+  it('springs to its target with a small overshoot and settles', async () => {
+    const { Spring } = await import('../../src/environments/globe/effects/explode');
+    const spring = new Spring();
+    let peak = 0;
+    for (let i = 0; i < 180; i++) peak = Math.max(peak, spring.step(1, 1 / 60));
+    expect(peak).toBeGreaterThan(1.01); // it overshoots: that is the snap
+    expect(peak).toBeLessThan(1.35);
+    expect(spring.value).toBeCloseTo(1, 2);
+    for (let i = 0; i < 180; i++) spring.step(0, 1 / 60);
+    expect(spring.value).toBeCloseTo(0, 2);
+  });
+
+  it('stays stable through a very slow frame', async () => {
+    const { Spring } = await import('../../src/environments/globe/effects/explode');
+    const spring = new Spring();
+    for (let i = 0; i < 40; i++) spring.step(1, 0.5);
+    expect(Number.isFinite(spring.value)).toBe(true);
+    expect(spring.value).toBeCloseTo(1, 1);
+  });
+});

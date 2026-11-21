@@ -121,6 +121,9 @@ Effects, one at a time, cross-fading when you change:
 
 - **Hologram scan**: fine bands of light drifting up the globe, a bright line sweeping through it,
   a faint flicker and an occasional glitch where a slice jumps sideways.
+- **Explode and reassemble**: stretch the globe wide with both hands (or the mouse wheel) and it
+  bursts into four drifting layers of dots turning against each other; bring your hands together
+  and it springs back into a sphere.
 - **None**: the plain globe.
 
 The Controls panel sets look, effect, colour, size, spin speed, glow, how much the camera picture

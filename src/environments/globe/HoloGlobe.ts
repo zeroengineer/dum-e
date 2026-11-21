@@ -335,6 +335,7 @@ export class HoloGlobe extends BaseEnvironment {
       look: this.look,
       effect: this.effect,
       video: this.backdrop.live,
+      ...(this.effect === 'none' ? null : this.effects.get(this.effect)?.effect.inspect?.()),
     };
   }
 
