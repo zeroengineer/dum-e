@@ -389,3 +389,48 @@ describe('GlobeState: fist, palm and reset', () => {
     expect(state.collapse).toBe(0);
   });
 });
+
+describe('hologram scan', () => {
+  it('glitches rarely, briefly and never past full strength', async () => {
+    const { glitchAt } = await import('../../src/environments/globe/effects/scan');
+    let active = 0;
+    const samples = 6000; // one minute at 100 samples a second
+    for (let i = 0; i < samples; i++) {
+      const { amount, y } = glitchAt(i / 100);
+      expect(amount).toBeGreaterThanOrEqual(0);
+      expect(amount).toBeLessThanOrEqual(1);
+      expect(y).toBeGreaterThanOrEqual(-1);
+      expect(y).toBeLessThanOrEqual(1);
+      if (amount > 0.05) active++;
+    }
+    // Present, but a small part of the time: between 2% and 15%.
+    expect(active / samples).toBeGreaterThan(0.02);
+    expect(active / samples).toBeLessThan(0.15);
+  });
+
+  it('starts and ends each glitch at nothing, so slices do not pop', async () => {
+    const { glitchAt } = await import('../../src/environments/globe/effects/scan');
+    for (let slot = 0; slot < 400; slot++) {
+      expect(glitchAt(slot * 0.09 + 1e-6).amount).toBeLessThan(0.01);
+      expect(glitchAt((slot + 1) * 0.09 - 1e-6).amount).toBeLessThan(0.01);
+    }
+  });
+
+  it('is the same every time for the same moment', async () => {
+    const { glitchAt, flickerAt } = await import('../../src/environments/globe/effects/scan');
+    expect(glitchAt(12.345)).toEqual(glitchAt(12.345));
+    expect(flickerAt(12.345)).toBe(flickerAt(12.345));
+  });
+
+  it('flickers a little and never brightens', async () => {
+    const { flickerAt } = await import('../../src/environments/globe/effects/scan');
+    let lowest = 1;
+    for (let i = 0; i < 3000; i++) {
+      const level = flickerAt(i / 100);
+      expect(level).toBeLessThanOrEqual(1);
+      lowest = Math.min(lowest, level);
+    }
+    expect(lowest).toBeGreaterThan(0.85);
+    expect(lowest).toBeLessThan(0.95);
+  });
+});

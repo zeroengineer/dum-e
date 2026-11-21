@@ -107,7 +107,7 @@ export const GESTURE_GUIDE: Record<
     { gesture: GESTURES.PINCH, does: 'Hold it still and spin it; turn your wrist to twist' },
     { gesture: GESTURES.FIST, does: 'Fold it up small' },
     { gesture: GESTURES.OPEN_PALM, does: 'Send out a pulse' },
-    { gesture: GESTURES.SWIPE, does: 'Change its look' },
+    { gesture: GESTURES.SWIPE, does: 'Change its effect' },
   ],
 };
 

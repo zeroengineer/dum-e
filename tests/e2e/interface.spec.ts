@@ -99,9 +99,14 @@ test('the globe follows the mouse, spins on drag and resizes with the wheel', as
   await expect.poll(async () => (await at()).radius).toBeGreaterThan(before * 1.2);
 
   await page.keyboard.press('ArrowLeft');
+  expect(await control(page, 'effect')).not.toBe('scan');
+  await page.getByLabel('Look').selectOption('grid');
   expect(await control(page, 'look')).toBe('grid');
+  await page.getByLabel('Effect').selectOption('none');
+  expect(await control(page, 'effect')).toBe('none');
   await page.keyboard.press('r');
   expect(await control(page, 'look')).toBe('earth');
+  expect(await control(page, 'effect')).toBe('scan');
   await expect.poll(async () => (await at()).radius).toBeCloseTo(0.14, 2);
 });
 
