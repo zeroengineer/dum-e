@@ -1,7 +1,7 @@
 // Copies the MediaPipe wasm runtime out of node_modules into public/mediapipe so the app
 // serves it itself, and tries to cache the hand landmarker model next to it.
 // Both outputs are gitignored. If the model download fails the app falls back to the CDN URL.
-import { access, cp, mkdir, writeFile } from 'node:fs/promises';
+import { access, copyFile, mkdir, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -23,12 +23,21 @@ if (!(await exists(wasmSrc))) {
   process.exit(0);
 }
 
+// The package ships two builds of the runtime. `FilesetResolver.forVisionTasks(base)`, as the
+// app calls it, loads the plain one; the `_module_` build is for ES-module loading, which the
+// app does not use. Shipping both doubled the deploy by 15 MB for nothing.
+const RUNTIME = ['vision_wasm_internal.js', 'vision_wasm_internal.wasm'];
+const UNUSED = ['vision_wasm_module_internal.js', 'vision_wasm_module_internal.wasm'];
+
 const force = process.argv.includes('--force');
-if (force || !(await exists(join(outDir, 'wasm/vision_wasm_internal.wasm')))) {
-  await mkdir(join(outDir, 'wasm'), { recursive: true });
-  await cp(wasmSrc, join(outDir, 'wasm'), { recursive: true });
+const wasmOut = join(outDir, 'wasm');
+if (force || !(await exists(join(wasmOut, 'vision_wasm_internal.wasm')))) {
+  await mkdir(wasmOut, { recursive: true });
+  for (const file of RUNTIME) await copyFile(join(wasmSrc, file), join(wasmOut, file));
   console.log('[copy-mediapipe] wasm runtime copied to public/mediapipe/wasm');
 }
+// Clear out copies made before this script stopped shipping the unused build.
+for (const file of UNUSED) await rm(join(wasmOut, file), { force: true });
 
 if (!(await exists(modelPath))) {
   try {

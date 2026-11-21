@@ -75,7 +75,19 @@ describe('toRawHands', () => {
     expect(hands[0].score).toBe(0.9);
     expect(hands[1].handedness).toBe('Right');
     expect(hands[0].landmarks).toHaveLength(21);
-    expect(hands[0].worldLandmarks).toHaveLength(21);
+  });
+
+  it('leaves out what nothing downstream reads', () => {
+    const [hand] = toRawHands({
+      landmarks: [points],
+      worldLandmarks: [points],
+      handedness: [category('Right', 0.9)],
+      handednesses: [],
+    });
+    // Metric landmarks were copied 24 times a second and never used.
+    expect(hand.worldLandmarks).toBeUndefined();
+    // Only the three coordinates are kept from each point.
+    expect(Object.keys(hand.landmarks[0])).toEqual(['x', 'y', 'z']);
   });
 
   it('drops incomplete hands and tolerates an empty result', () => {

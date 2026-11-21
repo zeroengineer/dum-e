@@ -119,6 +119,8 @@ still looks smooth at 60 fps.
   the interface drops its `backdrop-filter` blur (`:root[data-quality='low']`), which otherwise
   re-blurs the moving scene behind every panel each frame. Starfields draw fewer stars on lower
   tiers by shortening their draw range.
+- Only the MediaPipe runtime build the app loads is copied into the deploy
+  (`scripts/copy-mediapipe.mjs`); the package's ES-module build is left out, saving 15 MB.
 - No post-processing passes. Glow is additive blending on soft point sprites, which costs nothing
   extra and runs on integrated GPUs.
 - Pixel ratio is capped by quality tier (1 / 1.5 / 2) and particle budgets scale with it. The tier
