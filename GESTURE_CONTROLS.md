@@ -124,6 +124,9 @@ Effects, one at a time, cross-fading when you change:
 - **Explode and reassemble**: stretch the globe wide with both hands (or the mouse wheel) and it
   bursts into four drifting layers of dots turning against each other; bring your hands together
   and it springs back into a sphere.
+- **Energy and plasma**: a churning skin of light over the globe. An open palm sends a ring of
+  light down it, and arcs jump between its surface and any fingertip near it, so holding it
+  between two open hands wraps it in lightning.
 - **None**: the plain globe.
 
 The Controls panel sets look, effect, colour, size, spin speed, glow, how much the camera picture

@@ -468,3 +468,39 @@ describe('explode and reassemble', () => {
     expect(spring.value).toBeCloseTo(1, 1);
   });
 });
+
+describe('energy and plasma', () => {
+  it('reaches for fingertips near the globe, not inside it and not far away', async () => {
+    const { arcReach } = await import('../../src/environments/globe/effects/plasma');
+    expect(arcReach(0.3)).toBe(0); // a fingertip inside the globe
+    expect(arcReach(1)).toBe(0); // touching the surface
+    expect(arcReach(1.5)).toBe(1);
+    expect(arcReach(2.2)).toBe(1);
+    expect(arcReach(2.9)).toBeGreaterThan(0);
+    expect(arcReach(2.9)).toBeLessThan(1);
+    expect(arcReach(4)).toBe(0);
+  });
+
+  it('lays arcs out strand by strand, each a chain from the surface to the fingertip', async () => {
+    const { buildArcAttributes } = await import('../../src/environments/globe/effects/plasma');
+    const tips = 10;
+    const strands = 2;
+    const pieces = 14;
+    const { arc, along, strand } = buildArcAttributes(tips, strands, pieces);
+    expect(arc.length).toBe(tips * strands * pieces * 2);
+    const perStrand = tips * pieces * 2;
+    // The first part of the buffer is exactly the first strand, so low quality can draw just that.
+    expect([...strand.subarray(0, perStrand)].every((s) => s === 0)).toBe(true);
+    expect([...strand.subarray(perStrand)].every((s) => s === 1)).toBe(true);
+    // Every arc starts on the surface, ends at the tip, and each piece starts where the last ended.
+    for (let t = 0; t < tips; t++) {
+      const first = t * pieces * 2;
+      expect(arc[first]).toBe(t);
+      expect(along[first]).toBe(0);
+      expect(along[first + pieces * 2 - 1]).toBe(1);
+      for (let piece = 1; piece < pieces; piece++) {
+        expect(along[first + piece * 2]).toBe(along[first + piece * 2 - 1]);
+      }
+    }
+  });
+});
