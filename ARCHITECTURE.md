@@ -106,6 +106,11 @@ still looks smooth at 60 fps.
   copy for every detection. Revisit only with a profile that shows dropped frames.
 - Particles and stars are a single `THREE.Points` draw call each. Formation morphing, drift, hand
   forces and orbital motion run in the vertex shader; the CPU updates a handful of uniforms.
+- Building tens of thousands of particle, star or dot positions happens in one background
+  worker shared by every world (`src/environments/generation/`), with the buffers transferred
+  rather than copied. Changing formation, galaxy shape or quality no longer drops frames; the
+  main thread only uploads the result. Where a worker cannot start, the same code runs on the
+  main thread.
 - No post-processing passes. Glow is additive blending on soft point sprites, which costs nothing
   extra and runs on integrated GPUs.
 - Pixel ratio is capped by quality tier (1 / 1.5 / 2) and particle budgets scale with it. The tier

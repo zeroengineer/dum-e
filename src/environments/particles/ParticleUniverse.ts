@@ -9,14 +9,9 @@ import { Starfield } from '../../rendering/effects/Starfield';
 import { createParticleMaterial } from '../../rendering/materials/particleMaterial';
 import { clamp, damp } from '../../utils/math';
 import { timed } from '../../utils/perf';
+import { generate } from '../generation/generate';
 import { createRng } from '../../utils/rng';
-import {
-  FORMATIONS,
-  FORMATION_LABELS,
-  FORMATION_RADIUS,
-  generateFormation,
-  staggeredProgress,
-} from './formations';
+import { FORMATIONS, FORMATION_LABELS, FORMATION_RADIUS, staggeredProgress } from './formations';
 import type { FormationName } from './formations';
 
 export const PARTICLE_PALETTES = {
@@ -58,9 +53,15 @@ export class ParticleUniverse extends BaseEnvironment {
   private starfield: Starfield | null = null;
   private randoms = new Float32Array(0);
 
+  /** Particles in the buffers now, and the formation they hold. */
   private count = 0;
-  private explicitCount = false;
+  private liveFormation: FormationName | null = null;
+  /** What was asked for. Buffers catch up when the background generator delivers. */
+  private wantedCount = 0;
   private formation: FormationName = 'sphere';
+  private generating = false;
+  private disposed = false;
+  private explicitCount = false;
   private speed = 1;
   private size = 3;
   private spread = 1;
@@ -99,7 +100,7 @@ export class ParticleUniverse extends BaseEnvironment {
     this.material.uniforms.uSize.value = this.size;
 
     this.explicitCount = this.ctx.particleCount !== undefined;
-    this.rebuild(this.ctx.particleCount ?? QUALITY_PROFILES[this.ctx.quality].particles);
+    this.wantCount(this.ctx.particleCount ?? QUALITY_PROFILES[this.ctx.quality].particles);
 
     this.starfield = new Starfield(QUALITY_PROFILES[this.ctx.quality].backdropStars, 60, 11);
     this.scene.add(this.starfield.points);
@@ -123,7 +124,7 @@ export class ParticleUniverse extends BaseEnvironment {
         min: COUNT_MIN,
         max: COUNT_MAX,
         step: 1000,
-        value: this.count,
+        value: this.wantedCount,
       },
       { kind: 'range', id: 'speed', label: 'Speed', min: 0, max: 3, step: 0.05, value: this.speed },
       { kind: 'range', id: 'size', label: 'Size', min: 0.5, max: 8, step: 0.1, value: this.size },
@@ -161,7 +162,7 @@ export class ParticleUniverse extends BaseEnvironment {
       case 'count':
         if (typeof value === 'number') {
           this.explicitCount = value > 0;
-          this.rebuild(value > 0 ? value : QUALITY_PROFILES[this.ctx.quality].particles);
+          this.wantCount(value > 0 ? value : QUALITY_PROFILES[this.ctx.quality].particles);
         }
         break;
       case 'speed':
@@ -201,8 +202,8 @@ export class ParticleUniverse extends BaseEnvironment {
   setQuality(quality: QualityLevel, pixelRatio: number): void {
     super.setQuality(quality, pixelRatio);
     this.material.uniforms.uPixelRatio.value = pixelRatio;
-    if (!this.explicitCount && this.count !== QUALITY_PROFILES[quality].particles) {
-      this.rebuild(QUALITY_PROFILES[quality].particles);
+    if (!this.explicitCount && this.wantedCount !== QUALITY_PROFILES[quality].particles) {
+      this.wantCount(QUALITY_PROFILES[quality].particles);
       this.notifyControlsChanged();
     }
   }
@@ -231,7 +232,7 @@ export class ParticleUniverse extends BaseEnvironment {
   }
 
   get particleCount(): number {
-    return this.count;
+    return this.wantedCount;
   }
 
   // --- actions -------------------------------------------------------------------------------
@@ -332,7 +333,7 @@ export class ParticleUniverse extends BaseEnvironment {
     this.gestureSpreadCurrent = damp(this.gestureSpreadCurrent, this.gestureSpread, 8, dt);
     u.uScale.value = this.spread * this.gestureSpreadCurrent * this.expand;
 
-    this.wave = damp(this.wave, this.formation === 'wave' ? 0.3 : 0, 2.5, dt);
+    this.wave = damp(this.wave, this.liveFormation === 'wave' ? 0.3 : 0, 2.5, dt);
     u.uWave.value = this.wave;
 
     // The cloud turns slowly; it holds still while a group is being dragged so the grab stays put.
@@ -365,9 +366,41 @@ export class ParticleUniverse extends BaseEnvironment {
   // --- formations ----------------------------------------------------------------------------
 
   setFormation(name: FormationName): void {
+    if (name === this.formation) return;
+    this.formation = name;
+    this.sync();
+  }
+
+  private wantCount(requested: number): void {
+    this.wantedCount = Math.round(clamp(requested, COUNT_MIN, COUNT_MAX));
+    this.sync();
+  }
+
+  /**
+   * Brings the buffers into line with what was asked for. Positions are generated in the
+   * background, one request at a time; anything asked for meanwhile is picked up when it lands.
+   */
+  private sync(): void {
+    if (this.generating || this.disposed) return;
+    const name = this.formation;
+    const count = this.wantedCount;
+    if (this.points && count === this.count && name === this.liveFormation) return;
+    this.generating = true;
+    void generate({ kind: 'formation', name, count }).then((result) => {
+      this.generating = false;
+      if (this.disposed || result.kind !== 'formation') return;
+      timed('particles:apply', () => {
+        if (this.points && count === this.count) this.morphTo(name, result.positions);
+        else this.allocate(name, count, result.positions);
+      });
+      this.sync();
+    });
+  }
+
+  /** Starts the particles flowing from wherever they are to new target positions. */
+  private morphTo(name: FormationName, target: Float32Array): void {
     const points = this.points;
     if (!points) return;
-    if (name === this.formation && this.morph >= 1) return;
     const geometry = points.geometry;
     const from = geometry.getAttribute('position') as BufferAttribute;
     const to = geometry.getAttribute('aTarget') as BufferAttribute;
@@ -387,11 +420,11 @@ export class ParticleUniverse extends BaseEnvironment {
         a[k + 2] += (b[k + 2] - a[k + 2]) * t;
       }
     }
-    b.set(generateFormation(name, this.count));
+    b.set(target);
     from.needsUpdate = true;
     to.needsUpdate = true;
 
-    this.formation = name;
+    this.liveFormation = name;
     this.morph = 0;
     this.morphSeconds = name === 'explosion' ? 1.1 : MORPH_SECONDS;
     this.material.uniforms.uMorph.value = 0;
@@ -404,13 +437,7 @@ export class ParticleUniverse extends BaseEnvironment {
   }
 
   /** (Re)allocates the particle buffers for a new count, disposing the previous geometry. */
-  private rebuild(requested: number): void {
-    const count = Math.round(clamp(requested, COUNT_MIN, COUNT_MAX));
-    if (count === this.count && this.points) return;
-    timed('particles:rebuild', () => this.allocate(count));
-  }
-
-  private allocate(count: number): void {
+  private allocate(name: FormationName, count: number, target: Float32Array): void {
     const rotation = this.points?.rotation.y ?? 0;
     if (this.points) {
       this.resources.release(this.points.geometry);
@@ -418,11 +445,11 @@ export class ParticleUniverse extends BaseEnvironment {
     }
 
     this.count = count;
+    this.liveFormation = name;
     const rng = createRng(1234);
     this.randoms = new Float32Array(count * 4);
     for (let i = 0; i < this.randoms.length; i++) this.randoms[i] = rng();
 
-    const target = generateFormation(this.formation, count);
     const geometry = this.resources.track(new BufferGeometry());
     geometry.setAttribute('position', new BufferAttribute(new Float32Array(target), 3));
     geometry.setAttribute('aTarget', new BufferAttribute(target, 3));
@@ -465,6 +492,7 @@ export class ParticleUniverse extends BaseEnvironment {
   }
 
   dispose(): void {
+    this.disposed = true;
     this.starfield?.dispose();
     this.starfield = null;
     this.points?.removeFromParent();
