@@ -504,3 +504,63 @@ describe('energy and plasma', () => {
     }
   });
 });
+
+describe('orbiting rings and data', () => {
+  it('reads the point facing the viewer from how the globe is turned', async () => {
+    const { facingLatLon } = await import('../../src/environments/globe/geometry');
+    const { Quaternion, Vector3 } = await import('three');
+    const near = (a: { latitude: number; longitude: number }, lat: number, lon: number) => {
+      expect(a.latitude).toBeCloseTo(lat, 4);
+      expect(a.longitude).toBeCloseTo(lon, 4);
+    };
+    // Not turned: the prime meridian on the equator faces the viewer.
+    near(facingLatLon(0, 0, 0, 1), 0, 0);
+    // Spinning the globe eastward (the near side moves right) brings western longitudes round.
+    const yaw = new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), Math.PI / 2);
+    near(facingLatLon(yaw.x, yaw.y, yaw.z, yaw.w), 0, -90);
+    // Tipping the top toward the viewer brings the north into view.
+    const tip = new Quaternion().setFromAxisAngle(new Vector3(1, 0, 0), Math.PI / 6);
+    near(facingLatLon(tip.x, tip.y, tip.z, tip.w), 30, 0);
+  });
+
+  it('agrees with where the dots are: the facing point really is nearest the viewer', async () => {
+    const { facingLatLon, latLonToUnit } = await import('../../src/environments/globe/geometry');
+    const { Quaternion, Vector3, Euler } = await import('three');
+    const q = new Quaternion().setFromEuler(new Euler(0.4, -1.1, 0.3));
+    const { latitude, longitude } = facingLatLon(q.x, q.y, q.z, q.w);
+    const point = new Float32Array(3);
+    latLonToUnit(latitude, longitude, point, 0);
+    const turned = new Vector3(point[0], point[1], point[2]).applyQuaternion(q);
+    expect(turned.x).toBeCloseTo(0, 4);
+    expect(turned.y).toBeCloseTo(0, 4);
+    expect(turned.z).toBeCloseTo(1, 4);
+  });
+
+  it('writes the readout the way a navigator would', async () => {
+    const { formatReadout } = await import('../../src/environments/globe/effects/rings');
+    expect(formatReadout(12.34, 77.6, 0.14)).toEqual(['LAT 12.3° N', 'LON 077.6° E', 'SIZE 28%']);
+    expect(formatReadout(-33.9, -151.2, 0.48)).toEqual(['LAT 33.9° S', 'LON 151.2° W', 'SIZE 96%']);
+    expect(formatReadout(0, 0, 0.04)[0]).toBe('LAT 00.0° N');
+  });
+
+  it('stands the rings off further from a bigger globe, within limits', async () => {
+    const { ringSpread } = await import('../../src/environments/globe/effects/rings');
+    expect(ringSpread(GLOBE_RADIUS_MIN)).toBe(1);
+    expect(ringSpread(GLOBE_RADIUS_DEFAULT)).toBe(1);
+    expect(ringSpread(0.3)).toBeGreaterThan(1);
+    expect(ringSpread(0.3)).toBeLessThan(ringSpread(GLOBE_RADIUS_MAX));
+    expect(ringSpread(GLOBE_RADIUS_MAX)).toBeCloseTo(1.22);
+  });
+
+  it('draws a bezel of ticks with every sixth one longer', async () => {
+    const { generateTicks } = await import('../../src/environments/globe/geometry');
+    const ticks = generateTicks(72, 6, 1.09, 0.03, 0.075);
+    expect(ticks.length).toBe(72 * 6);
+    const length = (i: number) =>
+      Math.hypot(ticks[i * 6 + 3] - ticks[i * 6], ticks[i * 6 + 4] - ticks[i * 6 + 1]);
+    expect(length(0)).toBeCloseTo(0.075);
+    expect(length(1)).toBeCloseTo(0.03);
+    expect(length(6)).toBeCloseTo(0.075);
+    expect(Math.hypot(ticks[0], ticks[1])).toBeCloseTo(1.09);
+  });
+});

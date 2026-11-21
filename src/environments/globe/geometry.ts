@@ -99,3 +99,42 @@ export function generateGraticule(step = 15, segment = 5): Float32Array {
   }
   return out;
 }
+
+/** Tick marks round a circle in the XY plane: `count` of them, every `majorEvery`th one longer. */
+export function generateTicks(
+  count: number,
+  majorEvery: number,
+  inner: number,
+  minor: number,
+  major: number,
+): Float32Array {
+  const out = new Float32Array(count * 6);
+  for (let i = 0; i < count; i++) {
+    const angle = (i / count) * Math.PI * 2;
+    const outer = inner + (i % majorEvery === 0 ? major : minor);
+    const c = Math.cos(angle);
+    const s = Math.sin(angle);
+    out.set([c * inner, s * inner, 0, c * outer, s * outer, 0], i * 6);
+  }
+  return out;
+}
+
+/**
+ * The latitude and longitude of the point on the globe nearest the viewer, in degrees, for a
+ * globe turned by the unit quaternion (x, y, z, w). The viewer looks down the -z axis.
+ */
+export function facingLatLon(
+  x: number,
+  y: number,
+  z: number,
+  w: number,
+): { latitude: number; longitude: number } {
+  // Turn the viewer's direction (0, 0, 1) back into the globe's own frame: rotate by the inverse.
+  const lx = 2 * (x * z - w * y);
+  const ly = 2 * (y * z + w * x);
+  const lz = 1 - 2 * (x * x + y * y);
+  return {
+    latitude: Math.asin(Math.min(1, Math.max(-1, ly))) / DEG,
+    longitude: Math.atan2(lx, lz) / DEG,
+  };
+}

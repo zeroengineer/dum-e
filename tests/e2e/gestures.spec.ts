@@ -284,6 +284,19 @@ test.describe('Holo Globe', () => {
     expect(errors).toEqual([]);
   });
 
+  test('rings: the readout names the point facing you and follows the size', async ({ page }) => {
+    const errors = watchErrors(page);
+    await openWorld(page, 'globe');
+    await page.getByLabel('Spin speed').fill('0');
+    await page.getByLabel('Effect').selectOption('rings');
+    const readout = async () => String((await inspect(page)).readout);
+    await expect.poll(readout).toMatch(/^LAT \d\d\.\d° [NS]\|LON \d{3}\.\d° [EW]\|SIZE 28%$/);
+
+    await page.getByLabel('Size').fill('0.3');
+    await expect.poll(readout).toMatch(/SIZE 60%$/);
+    expect(errors).toEqual([]);
+  });
+
   test('draws fewer dots at lower quality without rebuilding', async ({ page }) => {
     await openWorld(page, 'globe');
     const dots = async () => (await inspect(page)).dots as number;

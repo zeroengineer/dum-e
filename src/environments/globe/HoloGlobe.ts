@@ -545,6 +545,7 @@ export class HoloGlobe extends BaseEnvironment {
         strength: live.strength,
         state: this.state,
         radius,
+        orientation: this.spin,
         tips: this.tips,
         tipsPresent: this.tipsPresent,
       });
