@@ -1,7 +1,7 @@
 import type { PerspectiveCamera, Scene } from 'three';
 import type { EnvironmentAction } from '../../interaction/actions';
 
-export type EnvironmentId = 'particles' | 'objects' | 'galaxy';
+export type EnvironmentId = 'particles' | 'objects' | 'galaxy' | 'globe';
 export type QualityLevel = 'low' | 'medium' | 'high';
 
 export interface EnvironmentContext {
@@ -57,6 +57,8 @@ export interface Environment {
   setVideo?(video: HTMLVideoElement | null): void;
   getControls(): ControlSpec[];
   setControl(id: string, value: ControlValue): void;
+  /** Facts about the scene for diagnostics and automated tests. Optional. */
+  inspect?(): Record<string, number | string | boolean>;
   /** Fires when control values change from inside the environment (for example a swipe changed a preset). */
   onControlsChanged(listener: () => void): () => void;
   dispose(): void;

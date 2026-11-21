@@ -97,14 +97,40 @@ With the mouse the galaxy turns only while you drag, so crossing the screen to r
 not spin it. Every parameter (stars, arms, twist, core, spread, thickness, bar, speed, colours,
 zoom) is also a slider or button in the Controls panel.
 
+## Holo Globe
+
+The camera picture fills the screen and a holographic globe sits in it, on your hand.
+
+| Gesture             | Effect                                                                     |
+| ------------------- | -------------------------------------------------------------------------- |
+| Show one hand       | The globe rides just beyond your palm, toward your fingers                 |
+| Move hand nearer    | The globe grows; farther away, it shrinks                                  |
+| Two hands           | The globe sits between your palms and fills the gap                        |
+| Two hands apart     | Grow                                                                       |
+| Two hands together  | Shrink                                                                     |
+| Pinch and move      | The globe stays put and spins under your hand; turn your wrist to twist it |
+| Fist                | Fold it up into a small bright ball                                        |
+| Open palm           | Send out a pulse                                                           |
+| Swipe left or up    | Next look                                                                  |
+| Swipe right or down | Previous look                                                              |
+| Take hands away     | The globe stays where you left it, at the size you made it                 |
+
+Looks: Earth (dotted continents) and Grid (latitude and longitude lines). The Controls panel sets
+look, colour, size, spin speed, glow, how much the camera picture is dimmed, and how tightly the
+globe follows your hand.
+
+With the camera off the globe floats in a starfield and the mouse carries it: move to carry, drag
+to spin, wheel to resize. With the camera on the mouse no longer carries it, so reaching for a
+button does not pull it out of your hand; drag and wheel still work.
+
 ## Global keys
 
-| Key         | Action                              |
-| ----------- | ----------------------------------- |
-| `1` `2` `3` | Switch world                        |
-| `R`         | Reset the current world             |
-| `T`         | Turn the camera on or off           |
-| `Esc`       | Close Settings or skip the tutorial |
+| Key        | Action                              |
+| ---------- | ----------------------------------- |
+| `1` to `4` | Switch world                        |
+| `R`        | Reset the current world             |
+| `T`        | Turn the camera on or off           |
+| `Esc`      | Close Settings or skip the tutorial |
 
 ## Checking with a real hand
 
@@ -121,6 +147,9 @@ Automated tests cannot put a hand in front of the camera, so these need a person
 5. Show both hands and move them apart: Two hands appears and the scene zooms or scales smoothly.
 6. Cover the camera for a moment mid-pinch: the pinch should survive a blink and end after a longer loss.
 7. In each world, try every row of its table above.
+8. In Holo Globe, hold up one open hand: the globe should sit just above your palm and stay on it
+   as you move, with no visible offset to one side. If it sits beside your hand, the picture and
+   the positions disagree; report the screen and camera shapes.
 
 If poses are missed or trigger too easily, adjust Gesture sensitivity first. The thresholds
 themselves live in `src/gestures/recognizers/`.

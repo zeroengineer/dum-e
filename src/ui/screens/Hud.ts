@@ -28,13 +28,19 @@ function handsLabel(hands: readonly string[]): string {
   return hands[0] === 'Left' ? 'Left hand' : 'Right hand';
 }
 
+/** Worlds that show the live camera picture across the whole screen. */
+const usesCameraPicture = (environment: EnvironmentId | null): boolean => environment === 'globe';
+
 /** The in-experience overlay: what the app sees, what it thinks you are doing, and every control. */
 export function createHud(app: App): { element: HTMLElement; dispose(): void } {
   const cleanups: Array<() => void> = [];
   const preview = new WebcamPreview(app.session.video);
   const controls = new ControlPanel();
-  // The top bar's camera button already covers the plain "off" case here.
-  const notice = createCameraNotice(app, { showWhenOff: false });
+  // The top bar's camera button already covers the plain "off" case, except in a world that is
+  // about the camera picture: there an empty stage needs explaining.
+  const notice = createCameraNotice(app, {
+    showWhenOff: () => usesCameraPicture(store.getState().environment),
+  });
   cleanups.push(notice.dispose);
 
   // --- top bar -------------------------------------------------------------------------------
@@ -217,7 +223,9 @@ export function createHud(app: App): { element: HTMLElement; dispose(): void } {
     handsPill.dataset.on = String(tracking.hands.length > 0);
     cameraButton.textContent = tracking.status === 'off' ? 'Turn camera on' : 'Turn camera off';
     const live = tracking.status === 'active' || tracking.status === 'paused';
-    preview.setVisible(live && store.getState().settings.showPreview);
+    // A world that fills the screen with the camera picture has no use for a second, small one.
+    const { settings, environment } = store.getState();
+    preview.setVisible(live && settings.showPreview && !usesCameraPicture(environment));
     if (!live) preview.clear();
   };
 
@@ -227,6 +235,8 @@ export function createHud(app: App): { element: HTMLElement; dispose(): void } {
     }
     controls.setEnvironment(app.environment);
     renderGuide(environment, store.getState().gestures);
+    renderStatus(store.getState().tracking);
+    notice.refresh();
   };
 
   cleanups.push(

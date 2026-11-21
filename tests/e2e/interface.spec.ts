@@ -67,6 +67,44 @@ test.describe('mouse and keyboard fallback', () => {
   });
 });
 
+test('the globe follows the mouse, spins on drag and resizes with the wheel', async ({ page }) => {
+  await openWorld(page, 'globe');
+  const box = (await page.locator('#stage').boundingBox())!;
+  const cx = box.x + box.width / 2;
+  const cy = box.y + box.height / 2;
+  const at = async () =>
+    (await page.evaluate(() => window.__DUME__!.scene().inspect)) as {
+      x: number;
+      y: number;
+      radius: number;
+    };
+
+  await page.mouse.move(cx, cy);
+  await page.mouse.move(cx + box.width * 0.2, cy - box.height * 0.2, { steps: 5 });
+  await expect.poll(async () => (await at()).x).toBeGreaterThan(0.35);
+  expect((await at()).y).toBeGreaterThan(0.35);
+
+  // Dragging spins it in place rather than carrying it.
+  const parked = await at();
+  await page.mouse.down();
+  await page.mouse.move(cx - box.width * 0.1, cy, { steps: 6 });
+  expect(await actionTypes(page)).toContain('grab');
+  expect((await at()).x).toBeCloseTo(parked.x, 1);
+  await page.mouse.up();
+
+  await clearRecorded(page);
+  const before = (await at()).radius;
+  await page.mouse.wheel(0, -300);
+  expect(await actionTypes(page)).toContain('span');
+  await expect.poll(async () => (await at()).radius).toBeGreaterThan(before * 1.2);
+
+  await page.keyboard.press('ArrowLeft');
+  expect(await control(page, 'look')).toBe('grid');
+  await page.keyboard.press('r');
+  expect(await control(page, 'look')).toBe('earth');
+  await expect.poll(async () => (await at()).radius).toBeCloseTo(0.14, 2);
+});
+
 test.describe('controls and settings', () => {
   test('the control panel drives the world and reset restores it', async ({ page }) => {
     await openWorld(page, 'galaxy');
@@ -84,6 +122,8 @@ test.describe('controls and settings', () => {
   });
 
   test('the object lab controls work', async ({ page }) => {
+    // Lit meshes render at about one frame a second under software WebGL, so every click waits.
+    test.slow();
     await openWorld(page, 'objects');
     await page.getByLabel('Objects').fill('14');
     expect(await control(page, 'count')).toBe(14);

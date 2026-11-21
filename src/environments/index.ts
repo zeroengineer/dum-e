@@ -1,6 +1,7 @@
 import type { Engine } from '../core/engine/Engine';
 import type { EnvironmentId } from '../core/scene/Environment';
 import { GalaxyExplorer } from './galaxy/GalaxyExplorer';
+import { HoloGlobe } from './globe/HoloGlobe';
 import { ObjectLab } from './objects/ObjectLab';
 import { ParticleUniverse } from './particles/ParticleUniverse';
 
@@ -26,6 +27,11 @@ export const ENVIRONMENTS: readonly EnvironmentInfo[] = [
     name: 'Galaxy Explorer',
     tagline: 'Turn, stretch and fly through a procedural spiral galaxy.',
   },
+  {
+    id: 'globe',
+    name: 'Holo Globe',
+    tagline: 'Hold a hologram of the Earth in your hand, on camera, and stretch it with both.',
+  },
 ];
 
 export function isEnvironmentId(value: unknown): value is EnvironmentId {
@@ -36,4 +42,5 @@ export function registerEnvironments(engine: Engine): void {
   engine.register('particles', () => new ParticleUniverse());
   engine.register('objects', () => new ObjectLab());
   engine.register('galaxy', () => new GalaxyExplorer());
+  engine.register('globe', () => new HoloGlobe());
 }

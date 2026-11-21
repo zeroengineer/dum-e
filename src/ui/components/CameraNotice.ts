@@ -25,13 +25,15 @@ const DETAIL: Partial<Record<Tracking['status'], string>> = {
  */
 export function createCameraNotice(
   app: App,
-  options: { showWhenOff: boolean } = { showWhenOff: true },
-): { element: HTMLElement; dispose(): void } {
+  options: { showWhenOff: boolean | (() => boolean) } = { showWhenOff: true },
+): { element: HTMLElement; dispose(): void; refresh(): void } {
   const element = h('div', { class: 'notice', attrs: { role: 'status', 'aria-live': 'polite' } });
 
   const render = (tracking: Tracking): void => {
     const { status } = tracking;
-    const headline = status === 'off' && !options.showWhenOff ? undefined : HEADLINE[status];
+    const showWhenOff =
+      typeof options.showWhenOff === 'function' ? options.showWhenOff() : options.showWhenOff;
+    const headline = status === 'off' && !showWhenOff ? undefined : HEADLINE[status];
     element.hidden = !headline;
     element.dataset.status = status;
     if (!headline) return;
@@ -71,5 +73,5 @@ export function createCameraNotice(
     render,
     (a, b) => a.status === b.status && a.message === b.message,
   );
-  return { element, dispose };
+  return { element, dispose, refresh: () => render(store.getState().tracking) };
 }
