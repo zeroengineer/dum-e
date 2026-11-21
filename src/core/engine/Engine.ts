@@ -1,7 +1,7 @@
 import { PerspectiveCamera, Scene } from 'three';
 import { Starfield } from '../../rendering/effects/Starfield';
 import { Emitter } from '../../utils/emitter';
-import { timed } from '../../utils/perf';
+import { timedAsync } from '../../utils/perf';
 import { SampleWindow } from '../../utils/stats';
 import { RendererManager } from '../renderer/RendererManager';
 import type { RendererOptions } from '../renderer/RendererManager';
@@ -50,6 +50,8 @@ interface EngineEvents {
 }
 
 const MAX_DT = 0.1;
+/** With no world open only a slow starfield is on screen; it does not need every frame. */
+const BACKDROP_INTERVAL_MS = 1000 / 30;
 
 /**
  * The render loop. Owns the renderer, the active environment and quality adaptation.
@@ -73,6 +75,7 @@ export class Engine {
   private governor: QualityGovernor | null = null;
   private quality: QualityLevel;
   private particleBudget = 0;
+  private lastBackdropRender = 0;
   private video: HTMLVideoElement | null = null;
   private profiling = false;
   private gpuSync = false;
@@ -85,7 +88,8 @@ export class Engine {
     const start = startingQuality(guessQuality(this.renderer.hints), devicePixelRatio());
     this.quality = start.tier;
     this.renderer.setPixelRatioCap(start.pixelRatio);
-    this.backdrop = new Starfield(QUALITY_PROFILES.medium.backdropStars);
+    this.backdrop = new Starfield(QUALITY_PROFILES.high.backdropStars);
+    this.backdrop.setDrawCount(QUALITY_PROFILES[this.quality].backdropStars);
     this.backdropScene.add(this.backdrop.points);
     this.backdropCamera.aspect = this.renderer.aspect;
     this.backdropCamera.updateProjectionMatrix();
@@ -109,10 +113,24 @@ export class Engine {
     this.scenes.register(id, factory);
   }
 
-  setEnvironment(id: EnvironmentId | null): Environment | null {
-    const environment = timed(`activate:${id ?? 'none'}`, () =>
-      this.scenes.activate(id, this.context()),
+  /**
+   * Switches world. The world's code is loaded and its shaders compiled first, with the current
+   * world still on screen; then the two are swapped. Resolves with whatever is on screen at the
+   * end, which is not the requested world if a later request overtook this one.
+   */
+  async setEnvironment(id: EnvironmentId | null): Promise<Environment | null> {
+    const environment = await timedAsync(`activate:${id ?? 'none'}`, () =>
+      this.scenes.activate(id, this.context(), (built) =>
+        this.renderer.compile(built.scene, built.camera),
+      ),
     );
+    if (environment === undefined) return this.scenes.current;
+    if (environment) {
+      // Whatever changed while it was loading has to reach it now.
+      environment.resize(this.renderer.aspect);
+      environment.setQuality(this.quality, this.renderer.pixelRatio);
+      environment.setVideo?.(this.video);
+    }
     this.governor?.settle();
     this.events.emit('environment', environment);
     return environment;
@@ -212,6 +230,7 @@ export class Engine {
     this.quality = next.tier;
     this.renderer.setPixelRatioCap(next.pixelRatio);
     this.scenes.current?.setQuality(next.tier, this.renderer.pixelRatio);
+    this.backdrop.setDrawCount(QUALITY_PROFILES[next.tier].backdropStars);
     if (changed) this.events.emit('quality', next.tier);
   }
 
@@ -228,8 +247,9 @@ export class Engine {
     if (environment) {
       environment.update(dt, this.elapsed);
       this.renderer.render(environment.scene, environment.camera);
-    } else {
-      this.backdrop.update(dt * 6);
+    } else if (now - this.lastBackdropRender >= BACKDROP_INTERVAL_MS - 1) {
+      this.backdrop.update(((now - this.lastBackdropRender) / 1000) * 6);
+      this.lastBackdropRender = now;
       this.renderer.render(this.backdropScene, this.backdropCamera);
     }
     if (this.profiling) {

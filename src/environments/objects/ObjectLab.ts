@@ -26,7 +26,7 @@ import { OrbitRig } from '../../core/camera/OrbitRig';
 import { ndcToPlane, worldToNdc } from '../../core/camera/projection';
 import { QUALITY_PROFILES } from '../../core/engine/quality';
 import { BaseEnvironment } from '../../core/scene/BaseEnvironment';
-import type { ControlSpec, ControlValue } from '../../core/scene/Environment';
+import type { ControlSpec, ControlValue, QualityLevel } from '../../core/scene/Environment';
 import type { EnvironmentAction } from '../../interaction/actions';
 import { Starfield } from '../../rendering/effects/Starfield';
 import { clamp, damp } from '../../utils/math';
@@ -154,7 +154,8 @@ export class ObjectLab extends BaseEnvironment {
     this.resources.track(gridMaterial);
     this.scene.add(grid);
 
-    this.starfield = new Starfield(QUALITY_PROFILES[this.ctx.quality].backdropStars, 80, 23);
+    this.starfield = new Starfield(QUALITY_PROFILES.high.backdropStars, 80, 23);
+    this.starfield.setDrawCount(QUALITY_PROFILES[this.ctx.quality].backdropStars);
     this.scene.add(this.starfield.points);
 
     this.buildGeometries();
@@ -345,6 +346,11 @@ export class ObjectLab extends BaseEnvironment {
         return;
     }
     this.notifyControlsChanged();
+  }
+
+  setQuality(quality: QualityLevel, pixelRatio: number): void {
+    super.setQuality(quality, pixelRatio);
+    this.starfield?.setDrawCount(QUALITY_PROFILES[quality].backdropStars);
   }
 
   reset(): void {

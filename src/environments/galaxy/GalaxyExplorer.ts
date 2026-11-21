@@ -92,7 +92,8 @@ export class GalaxyExplorer extends BaseEnvironment {
     this.config.stars = QUALITY_PROFILES[this.ctx.quality].stars;
     this.startGeneration();
 
-    this.starfield = new Starfield(QUALITY_PROFILES[this.ctx.quality].backdropStars, 110, 31);
+    this.starfield = new Starfield(QUALITY_PROFILES.high.backdropStars, 110, 31);
+    this.starfield.setDrawCount(QUALITY_PROFILES[this.ctx.quality].backdropStars);
     this.scene.add(this.starfield.points);
   }
 
@@ -205,6 +206,7 @@ export class GalaxyExplorer extends BaseEnvironment {
 
   setQuality(quality: QualityLevel, pixelRatio: number): void {
     super.setQuality(quality, pixelRatio);
+    this.starfield?.setDrawCount(QUALITY_PROFILES[quality].backdropStars);
     this.material.uniforms.uPixelRatio.value = pixelRatio;
     if (!this.explicitStars && this.config.stars !== QUALITY_PROFILES[quality].stars) {
       this.config.stars = QUALITY_PROFILES[quality].stars;

@@ -111,6 +111,14 @@ still looks smooth at 60 fps.
   rather than copied. Changing formation, galaxy shape or quality no longer drops frames; the
   main thread only uploads the result. Where a worker cannot start, the same code runs on the
   main thread.
+- Each world is its own chunk, fetched the first time it is opened and prefetched when the page
+  is idle. Switching is asynchronous (`SceneManager.activate`): the new world is built and its
+  shaders compiled with `compileAsync` while the old one stays on screen, then they swap; if
+  another world is asked for meanwhile, only the latest request is shown.
+- With no world open only the backdrop starfield is drawn, at 30 frames a second. On the low tier
+  the interface drops its `backdrop-filter` blur (`:root[data-quality='low']`), which otherwise
+  re-blurs the moving scene behind every panel each frame. Starfields draw fewer stars on lower
+  tiers by shortening their draw range.
 - No post-processing passes. Glow is additive blending on soft point sprites, which costs nothing
   extra and runs on integrated GPUs.
 - Pixel ratio is capped by quality tier (1 / 1.5 / 2) and particle budgets scale with it. The tier

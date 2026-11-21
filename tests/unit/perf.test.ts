@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { recentMeasures, timed } from '../../src/utils/perf';
+import { recentMeasures, timed, timedAsync } from '../../src/utils/perf';
 import { SampleWindow } from '../../src/utils/stats';
 
 describe('SampleWindow', () => {
@@ -63,6 +63,21 @@ describe('timed', () => {
       }),
     ).toThrow('boom');
     expect(recentMeasures(1)[0].name).toBe('unit-test-failure');
+  });
+
+  it('times work that finishes later, including the wait', async () => {
+    const result = await timedAsync(
+      'unit-test-later',
+      () => new Promise<string>((resolve) => setTimeout(() => resolve('done'), 20)),
+    );
+    expect(result).toBe('done');
+    const [latest] = recentMeasures(1);
+    expect(latest.name).toBe('unit-test-later');
+    expect(latest.duration).toBeGreaterThanOrEqual(15);
+    await expect(
+      timedAsync('unit-test-rejects', () => Promise.reject(new Error('no'))),
+    ).rejects.toThrow('no');
+    expect(recentMeasures(1)[0].name).toBe('unit-test-rejects');
   });
 
   it('lists the most recent measures, newest first', () => {

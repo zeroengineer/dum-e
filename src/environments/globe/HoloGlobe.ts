@@ -136,7 +136,8 @@ export class HoloGlobe extends BaseEnvironment {
     this.backdrop.setDimming(this.dimming);
     this.scene.add(this.backdrop.mesh);
     // Without a camera the globe floats in the same night sky as the other worlds.
-    this.starfield = new Starfield(QUALITY_PROFILES[this.ctx.quality].backdropStars, 90, 53);
+    this.starfield = new Starfield(QUALITY_PROFILES.high.backdropStars, 90, 53);
+    this.starfield.setDrawCount(QUALITY_PROFILES[this.ctx.quality].backdropStars);
     this.scene.add(this.starfield.points);
 
     timed('globe:build', () => this.buildGlobe());
@@ -305,6 +306,7 @@ export class HoloGlobe extends BaseEnvironment {
 
   setQuality(quality: QualityLevel, pixelRatio: number): void {
     super.setQuality(quality, pixelRatio);
+    this.starfield?.setDrawCount(QUALITY_PROFILES[quality].backdropStars);
     this.applyDrawCount(quality);
     for (const live of this.effects.values()) live.effect.setQuality?.(quality);
   }

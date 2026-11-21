@@ -64,4 +64,5 @@ export interface Environment {
   dispose(): void;
 }
 
-export type EnvironmentFactory = () => Environment;
+/** Makes a world. It may return a promise, so a world's code can be loaded on demand. */
+export type EnvironmentFactory = () => Environment | Promise<Environment>;

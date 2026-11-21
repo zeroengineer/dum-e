@@ -3,6 +3,7 @@ import type { Camera, Scene } from 'three';
 import type { DeviceHints } from '../engine/quality';
 
 export const BACKGROUND_COLOR = 0x04060c;
+const COMPILE_WAIT_MS = 1500;
 
 export interface RendererOptions {
   /** Multisample the drawing buffer. Defaults to on only for displays below 1.5x density. */
@@ -90,6 +91,18 @@ export class RendererManager {
 
   render(scene: Scene, camera: Camera): void {
     if (!this.contextLost) this.renderer.render(scene, camera);
+  }
+
+  /**
+   * Compiles every shader a scene needs without blocking, so its first frame does not stall.
+   * Gives up waiting after a moment: a slow driver must not hold a world back indefinitely.
+   */
+  async compile(scene: Scene, camera: Camera): Promise<void> {
+    if (this.contextLost) return;
+    await Promise.race([
+      this.renderer.compileAsync(scene, camera).then(() => undefined),
+      new Promise<void>((resolve) => setTimeout(resolve, COMPILE_WAIT_MS)),
+    ]);
   }
 
   /**

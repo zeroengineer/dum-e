@@ -102,7 +102,8 @@ export class ParticleUniverse extends BaseEnvironment {
     this.explicitCount = this.ctx.particleCount !== undefined;
     this.wantCount(this.ctx.particleCount ?? QUALITY_PROFILES[this.ctx.quality].particles);
 
-    this.starfield = new Starfield(QUALITY_PROFILES[this.ctx.quality].backdropStars, 60, 11);
+    this.starfield = new Starfield(QUALITY_PROFILES.high.backdropStars, 60, 11);
+    this.starfield.setDrawCount(QUALITY_PROFILES[this.ctx.quality].backdropStars);
     this.scene.add(this.starfield.points);
   }
 
@@ -201,6 +202,7 @@ export class ParticleUniverse extends BaseEnvironment {
 
   setQuality(quality: QualityLevel, pixelRatio: number): void {
     super.setQuality(quality, pixelRatio);
+    this.starfield?.setDrawCount(QUALITY_PROFILES[quality].backdropStars);
     this.material.uniforms.uPixelRatio.value = pixelRatio;
     if (!this.explicitCount && this.wantedCount !== QUALITY_PROFILES[quality].particles) {
       this.wantCount(QUALITY_PROFILES[quality].particles);
