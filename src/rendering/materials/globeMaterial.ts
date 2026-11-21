@@ -39,6 +39,7 @@ export function createGlobeDotsMaterial(maxPointSize: number): ShaderMaterial {
       uGlitch: { value: 0 },
       uGlitchY: { value: 0 },
       uFlicker: { value: 1 },
+      uExplode: { value: 0 },
     },
   });
 }
@@ -57,6 +58,7 @@ export function createGlobeLinesMaterial(): ShaderMaterial {
       uGlitch: { value: 0 },
       uGlitchY: { value: 0 },
       uFlicker: { value: 1 },
+      uExplode: { value: 0 },
     },
   });
 }
@@ -77,6 +79,7 @@ export function createGlobeShellMaterial(): ShaderMaterial {
       uGlitch: { value: 0 },
       uGlitchY: { value: 0 },
       uFlicker: { value: 1 },
+      uExplode: { value: 0 },
     },
   });
 }

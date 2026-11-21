@@ -29,6 +29,31 @@ float glitchShift(float h) {
 }
 `;
 
+/**
+ * Explode: each dot belongs to one of four layers. Apart, two layers sink inside the sphere and
+ * two rise outside it, neighbours turning opposite ways, with every dot bobbing a little.
+ * The whole stays about the size of the globe, so it never leaves the picture or reaches the
+ * viewer. uExplode is 0 for a sphere and 1 for fully apart.
+ */
+const EXPLODE = /* glsl */ `
+uniform float uExplode;
+
+vec3 explodeDot(vec3 unitPosition, vec4 seed, float time) {
+  float layer = floor(seed.z * 4.0) - 1.5; // -1.5, -0.5, 0.5, 1.5
+  float turn = uExplode * layer * (0.55 + time * 0.1);
+  float c = cos(turn);
+  float s = sin(turn);
+  vec3 p = vec3(
+    unitPosition.x * c + unitPosition.z * s,
+    unitPosition.y,
+    unitPosition.z * c - unitPosition.x * s
+  );
+  p *= 1.0 + uExplode * (layer * 0.2 + (seed.w - 0.5) * 0.07);
+  p += (seed.yzw - 0.5) * uExplode * 0.09 * sin(time * 0.9 + seed.w * 6.2831853);
+  return p;
+}
+`;
+
 /** Shared by the dots and the grid: how squarely a point on the sphere faces the viewer. */
 const FACING = /* glsl */ `
 float facingOf(vec3 unitPosition, vec4 viewPosition) {
@@ -52,19 +77,21 @@ attribute vec4 aSeed;
 
 varying vec3 vColor;
 varying float vAlpha;
-${FACING}${SCAN}
+${FACING}${SCAN}${EXPLODE}
 void main() {
-  vec4 mv = modelViewMatrix * vec4(position, 1.0);
+  vec3 p = explodeDot(position, aSeed, uTime);
+  vec4 mv = modelViewMatrix * vec4(p, 1.0);
   gl_Position = projectionMatrix * mv;
-  float h = heightOnScreen(position);
+  float h = heightOnScreen(p);
   gl_Position.x += glitchShift(h) * gl_Position.w;
 
   // The far side of the globe shows through, dimmer, as it would in a projection.
-  float front = smoothstep(-0.2, 0.45, facingOf(position, mv));
+  float front = smoothstep(-0.2, 0.45, facingOf(normalize(p), mv));
 
   float land = aSeed.x;
   // With the map on, the sea keeps only a sprinkling of faint dots to suggest the sphere.
-  float keep = mix(1.0, step(aSeed.y, 0.22), (1.0 - land) * uLand);
+  // Blown apart, the whole sphere is shown: the sea's dots are part of the cloud.
+  float keep = mix(1.0, step(aSeed.y, mix(0.22, 0.6, uExplode)), (1.0 - land) * uLand);
   float level = mix(0.5, mix(0.2, 1.0, land), uLand);
   float twinkle = 0.86 + 0.14 * sin(uTime * 2.1 + aSeed.w * 6.2831853);
 
@@ -95,9 +122,11 @@ void main() {
 export const globeLinesVertexShader = /* glsl */ `
 varying float vFront;
 varying float vScan;
+uniform float uExplode;
 ${FACING}${SCAN}
 void main() {
-  vec4 mv = modelViewMatrix * vec4(position, 1.0);
+  // The grid swells a little and thins out as the dots leave it behind.
+  vec4 mv = modelViewMatrix * vec4(position * (1.0 + uExplode * 0.12), 1.0);
   gl_Position = projectionMatrix * mv;
   float h = heightOnScreen(position);
   gl_Position.x += glitchShift(h) * gl_Position.w;
@@ -110,11 +139,12 @@ export const globeLinesFragmentShader = /* glsl */ `
 uniform vec3 uColor;
 uniform float uOpacity;
 uniform float uBoost;
+uniform float uExplode;
 varying float vFront;
 varying float vScan;
 
 void main() {
-  gl_FragColor = vec4(uColor * uBoost * vScan, uOpacity * mix(0.14, 1.0, vFront));
+  gl_FragColor = vec4(uColor * uBoost * vScan, uOpacity * mix(0.14, 1.0, vFront) * (1.0 - uExplode * 0.75));
   #include <colorspace_fragment>
 }
 `;
@@ -139,6 +169,7 @@ uniform float uRim;
 uniform float uFill;
 uniform float uBoost;
 uniform float uScan;
+uniform float uExplode;
 varying vec3 vNormal;
 varying vec3 vView;
 varying float vScan;
@@ -149,7 +180,7 @@ void main() {
   // Scanning fills the body of the globe with fine raster lines, like a projected image.
   float raster = 0.5 + 0.5 * sin(gl_FragCoord.y * 1.7);
   float fill = uFill * mix(1.0, 1.5 + 3.0 * raster, uScan);
-  float strength = (fresnel * uRim + fill) * uBoost * vScan;
+  float strength = (fresnel * uRim + fill) * uBoost * vScan * (1.0 - uExplode * 0.85);
   gl_FragColor = vec4(uColor * strength, strength);
   #include <colorspace_fragment>
 }

@@ -242,6 +242,29 @@ test.describe('Holo Globe', () => {
     expect((await inspect(page)).effect).toBe(next);
   });
 
+  test('explode: stretching it wide bursts it apart and closing the hands reassembles it', async ({
+    page,
+  }) => {
+    await openWorld(page, 'globe');
+    await page.getByLabel('Effect').selectOption('explode');
+    const explode = async () => (await inspect(page)).explode as number;
+    expect(await explode()).toBeCloseTo(0, 2);
+
+    // An ordinary hold leaves it whole.
+    await feed(page, 14, pair(0.35));
+    await page.waitForTimeout(500);
+    expect(await explode()).toBeLessThan(0.05);
+
+    // Hands at the edges of the picture.
+    await feed(page, 14, (p) => pair(0.35 + p * 0.55));
+    await feed(page, 4, pair(0.9));
+    await expect.poll(explode).toBeGreaterThan(0.8);
+
+    await feed(page, 14, (p) => pair(0.9 - p * 0.6));
+    await feed(page, 4, pair(0.3));
+    await expect.poll(explode).toBeLessThan(0.05);
+  });
+
   test('draws fewer dots at lower quality without rebuilding', async ({ page }) => {
     await openWorld(page, 'globe');
     const dots = async () => (await inspect(page)).dots as number;

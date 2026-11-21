@@ -43,6 +43,8 @@ export interface GlobeEffect {
   update(frame: GlobeFrame): void;
   setColour?(main: string, accent: string): void;
   setQuality?(quality: QualityLevel): void;
+  /** Facts for diagnostics and automated tests. */
+  inspect?(): Record<string, number | string | boolean>;
 }
 
 export interface GlobeEffectInfo {
