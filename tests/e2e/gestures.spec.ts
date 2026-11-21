@@ -214,7 +214,7 @@ test.describe('Holo Globe', () => {
     await expect(page.getByLabel('Size')).toHaveValue(/0\.\d+/);
   });
 
-  test('pinch holds it still, fist folds it, open palm pulses, swipe changes its look', async ({
+  test('pinch holds it still, fist folds it, open palm pulses, swipe changes its effect', async ({
     page,
   }) => {
     await openWorld(page, 'globe');
@@ -233,11 +233,13 @@ test.describe('Holo Globe', () => {
     await expect.poll(async () => (await inspect(page)).collapse as number).toBeLessThan(0.3);
 
     await feed(page, 14, []);
-    expect(await control(page, 'look')).toBe('earth');
+    expect(await control(page, 'effect')).toBe('scan');
     await feed(page, 12, [{ pose: 'open', x: 0.7 }]);
     await feed(page, 7, (p) => [{ pose: 'open', x: 0.7 - p * 0.4 }]);
-    expect(await control(page, 'look')).toBe('grid');
-    await expect(page.getByLabel('Look')).toHaveValue('grid');
+    const next = await control(page, 'effect');
+    expect(next).not.toBe('scan');
+    await expect(page.getByLabel('Effect')).toHaveValue(String(next));
+    expect((await inspect(page)).effect).toBe(next);
   });
 
   test('draws fewer dots at lower quality without rebuilding', async ({ page }) => {

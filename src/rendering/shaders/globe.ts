@@ -1,5 +1,34 @@
 // Holo Globe shaders. Everything that moves is driven by uniforms; no buffer is touched per frame.
 
+/**
+ * Hologram scan, shared by everything drawn on the sphere. `h` is how high a point is on the
+ * globe as seen on screen (-1 bottom, 1 top), so the bands stay level however the globe turns.
+ */
+const SCAN = /* glsl */ `
+uniform float uScan;
+uniform float uScanTime;
+uniform float uGlitch;
+uniform float uGlitchY;
+uniform float uFlicker;
+
+float heightOnScreen(vec3 unitPosition) {
+  return (modelViewMatrix * vec4(unitPosition, 0.0)).y / length(modelMatrix[0].xyz);
+}
+
+/** Brightness multiplier at height h. */
+float scanLight(float h) {
+  float bands = 0.5 + 0.5 * sin(h * 46.0 - uScanTime * 5.0);
+  float sweepAt = fract(uScanTime * 0.22) * 2.6 - 1.3;
+  float sweep = smoothstep(0.16, 0.0, abs(h - sweepAt));
+  return (mix(1.0, 0.45 + 0.75 * bands, uScan) + sweep * uScan * 1.6) * uFlicker;
+}
+
+/** Sideways jump, in clip units, of the slice a glitch has hold of. */
+float glitchShift(float h) {
+  return smoothstep(0.12, 0.0, abs(h - uGlitchY)) * uGlitch * 0.06;
+}
+`;
+
 /** Shared by the dots and the grid: how squarely a point on the sphere faces the viewer. */
 const FACING = /* glsl */ `
 float facingOf(vec3 unitPosition, vec4 viewPosition) {
@@ -23,10 +52,12 @@ attribute vec4 aSeed;
 
 varying vec3 vColor;
 varying float vAlpha;
-${FACING}
+${FACING}${SCAN}
 void main() {
   vec4 mv = modelViewMatrix * vec4(position, 1.0);
   gl_Position = projectionMatrix * mv;
+  float h = heightOnScreen(position);
+  gl_Position.x += glitchShift(h) * gl_Position.w;
 
   // The far side of the globe shows through, dimmer, as it would in a projection.
   float front = smoothstep(-0.2, 0.45, facingOf(position, mv));
@@ -43,7 +74,7 @@ void main() {
   float size = uDot * spacing * (0.75 + 0.5 * aSeed.z) * mix(0.8, 1.0, land * uLand);
   gl_PointSize = clamp(size, 1.5, uMaxPointSize);
 
-  vColor = mix(uColor, uAccent, land * uLand * 0.65) * level * twinkle * uBoost;
+  vColor = mix(uColor, uAccent, land * uLand * 0.65) * level * twinkle * uBoost * scanLight(h);
   vAlpha = keep * mix(0.16, 1.0, front);
 }
 `;
@@ -63,11 +94,15 @@ void main() {
 
 export const globeLinesVertexShader = /* glsl */ `
 varying float vFront;
-${FACING}
+varying float vScan;
+${FACING}${SCAN}
 void main() {
   vec4 mv = modelViewMatrix * vec4(position, 1.0);
   gl_Position = projectionMatrix * mv;
+  float h = heightOnScreen(position);
+  gl_Position.x += glitchShift(h) * gl_Position.w;
   vFront = smoothstep(-0.2, 0.45, facingOf(position, mv));
+  vScan = scanLight(h);
 }
 `;
 
@@ -76,9 +111,10 @@ uniform vec3 uColor;
 uniform float uOpacity;
 uniform float uBoost;
 varying float vFront;
+varying float vScan;
 
 void main() {
-  gl_FragColor = vec4(uColor * uBoost, uOpacity * mix(0.14, 1.0, vFront));
+  gl_FragColor = vec4(uColor * uBoost * vScan, uOpacity * mix(0.14, 1.0, vFront));
   #include <colorspace_fragment>
 }
 `;
@@ -86,12 +122,14 @@ void main() {
 export const globeShellVertexShader = /* glsl */ `
 varying vec3 vNormal;
 varying vec3 vView;
-
+varying float vScan;
+${SCAN}
 void main() {
   vec4 mv = modelViewMatrix * vec4(position, 1.0);
   gl_Position = projectionMatrix * mv;
   vNormal = normalize(normalMatrix * normal);
   vView = normalize(-mv.xyz);
+  vScan = scanLight(heightOnScreen(position));
 }
 `;
 
@@ -100,13 +138,18 @@ uniform vec3 uColor;
 uniform float uRim;
 uniform float uFill;
 uniform float uBoost;
+uniform float uScan;
 varying vec3 vNormal;
 varying vec3 vView;
+varying float vScan;
 
 void main() {
   // Bright at the edge, nearly clear in the middle: a ball of light, not a solid.
   float fresnel = pow(1.0 - clamp(dot(normalize(vNormal), normalize(vView)), 0.0, 1.0), 2.6);
-  float strength = (fresnel * uRim + uFill) * uBoost;
+  // Scanning fills the body of the globe with fine raster lines, like a projected image.
+  float raster = 0.5 + 0.5 * sin(gl_FragCoord.y * 1.7);
+  float fill = uFill * mix(1.0, 1.5 + 3.0 * raster, uScan);
+  float strength = (fresnel * uRim + fill) * uBoost * vScan;
   gl_FragColor = vec4(uColor * strength, strength);
   #include <colorspace_fragment>
 }

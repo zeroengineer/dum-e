@@ -111,13 +111,20 @@ The camera picture fills the screen and a holographic globe sits in it, on your 
 | Pinch and move      | The globe stays put and spins under your hand; turn your wrist to twist it |
 | Fist                | Fold it up into a small bright ball                                        |
 | Open palm           | Send out a pulse                                                           |
-| Swipe left or up    | Next look                                                                  |
-| Swipe right or down | Previous look                                                              |
+| Swipe left or up    | Next effect                                                                |
+| Swipe right or down | Previous effect                                                            |
 | Take hands away     | The globe stays where you left it, at the size you made it                 |
 
-Looks: Earth (dotted continents) and Grid (latitude and longitude lines). The Controls panel sets
-look, colour, size, spin speed, glow, how much the camera picture is dimmed, and how tightly the
-globe follows your hand.
+Looks: Earth (dotted continents) and Grid (latitude and longitude lines).
+
+Effects, one at a time, cross-fading when you change:
+
+- **Hologram scan**: fine bands of light drifting up the globe, a bright line sweeping through it,
+  a faint flicker and an occasional glitch where a slice jumps sideways.
+- **None**: the plain globe.
+
+The Controls panel sets look, effect, colour, size, spin speed, glow, how much the camera picture
+is dimmed, and how tightly the globe follows your hand.
 
 With the camera off the globe floats in a starfield and the mouse carries it: move to carry, drag
 to spin, wheel to resize. With the camera on the mouse no longer carries it, so reaching for a

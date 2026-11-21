@@ -29,6 +29,8 @@ import {
 } from '../../rendering/materials/globeMaterial';
 import { clamp, damp, lerp } from '../../utils/math';
 import { timed } from '../../utils/perf';
+import { GLOBE_EFFECTS, GLOBE_EFFECT_CHOICES } from './effects';
+import type { GlobeEffect, GlobeEffectName, GlobeParts } from './effects';
 import { generateGlobeDots, generateGraticule } from './geometry';
 import {
   COLLAPSED_SCALE,
@@ -62,7 +64,17 @@ const DOTS_MAX = DOTS.high;
 const CAMERA_DISTANCE = 6;
 /** The halo quad is this many globe radii across, so the glow has room to fade out. */
 const HALO_SPAN = 3.2;
-const DEFAULTS = { look: 'earth', colour: 'arc', glow: 1, dimming: 0.35 } as const;
+const DEFAULTS = { look: 'earth', colour: 'arc', effect: 'scan', glow: 1, dimming: 0.35 } as const;
+
+type EffectChoice = GlobeEffectName | 'none';
+/** Five fingertips for each of two hands. */
+const TIP_COUNT = 10;
+
+interface LiveEffect {
+  effect: GlobeEffect;
+  /** 0 off, 1 on; eased so effects cross-fade. */
+  strength: number;
+}
 
 const ORIGIN = new Vector3();
 const AXIS_X = new Vector3(1, 0, 0);
@@ -86,6 +98,14 @@ export class HoloGlobe extends BaseEnvironment {
   private readonly globe = new Group();
   /** The parts that turn with the globe; the halo stays facing the screen. */
   private readonly turning = new Group();
+  /** Effect parts that move with the globe but do not turn with it. */
+  private readonly fixed = new Group();
+  private readonly effects = new Map<GlobeEffectName, LiveEffect>();
+  private effect: EffectChoice = DEFAULTS.effect;
+  /** Fingertips in device coordinates as last reported, and from there in scene units. */
+  private readonly tipPoints = Array.from({ length: TIP_COUNT }, () => new Vector2());
+  private readonly tips = Array.from({ length: TIP_COUNT }, () => new Vector3());
+  private readonly tipsPresent = new Array<boolean>(TIP_COUNT).fill(false);
   private readonly spin = new Quaternion();
   private readonly turn = new Quaternion();
   private dots!: Points<BufferGeometry, ShaderMaterial>;
@@ -119,6 +139,7 @@ export class HoloGlobe extends BaseEnvironment {
 
     timed('globe:build', () => this.buildGlobe());
     this.resetOrientation();
+    this.setEffect(this.effect);
     this.applyColour();
     this.applyDrawCount(this.ctx.quality);
     this.setVideo(this.ctx.video);
@@ -157,7 +178,7 @@ export class HoloGlobe extends BaseEnvironment {
     this.halo.material.uniforms.uEdge.value = 2 / HALO_SPAN;
 
     this.turning.add(this.shell, this.lines, this.dots);
-    this.globe.add(this.halo, this.turning);
+    this.globe.add(this.halo, this.turning, this.fixed);
     for (const part of [this.dots, this.lines, this.shell, this.halo]) part.frustumCulled = false;
     this.halo.renderOrder = 1;
     this.shell.renderOrder = 2;
@@ -182,6 +203,16 @@ export class HoloGlobe extends BaseEnvironment {
         label: 'Look',
         value: this.look,
         options: LOOK_NAMES.map((value) => ({ value, label: GLOBE_LOOKS[value].label })),
+      },
+      {
+        kind: 'select',
+        id: 'effect',
+        label: 'Effect',
+        value: this.effect,
+        options: GLOBE_EFFECT_CHOICES.map((value) => ({
+          value,
+          label: value === 'none' ? 'None' : GLOBE_EFFECTS[value].label,
+        })),
       },
       {
         kind: 'select',
@@ -227,16 +258,19 @@ export class HoloGlobe extends BaseEnvironment {
         step: 1,
         value: this.state.follow,
       },
-      { kind: 'button', id: 'next', label: 'Next look' },
+      { kind: 'button', id: 'next', label: 'Next effect' },
     ];
   }
 
   setControl(id: string, value: ControlValue): void {
     if (id === 'next') {
-      this.cycleLook(1);
-      return; // cycleLook notifies
+      this.cycleEffect(1);
+      return; // cycleEffect notifies
     }
-    if (id === 'look') {
+    if (id === 'effect') {
+      if (!GLOBE_EFFECT_CHOICES.includes(value as EffectChoice)) return;
+      this.setEffect(value as EffectChoice);
+    } else if (id === 'look') {
       if (typeof value !== 'string' || !(value in GLOBE_LOOKS)) return;
       this.look = value as LookName;
     } else if (id === 'colour') {
@@ -265,6 +299,7 @@ export class HoloGlobe extends BaseEnvironment {
   setQuality(quality: QualityLevel, pixelRatio: number): void {
     super.setQuality(quality, pixelRatio);
     this.applyDrawCount(quality);
+    for (const live of this.effects.values()) live.effect.setQuality?.(quality);
   }
 
   resize(aspect: number): void {
@@ -278,6 +313,7 @@ export class HoloGlobe extends BaseEnvironment {
     this.state.setFollow(DEFAULT_GLOBE_OPTIONS.follow);
     this.look = DEFAULTS.look;
     this.colour = DEFAULTS.colour;
+    this.setEffect(DEFAULTS.effect);
     this.glow = DEFAULTS.glow;
     this.dimming = DEFAULTS.dimming;
     this.backdrop.setDimming(this.dimming);
@@ -297,14 +333,36 @@ export class HoloGlobe extends BaseEnvironment {
       pulse: this.state.pulse,
       dots: this.drawn,
       look: this.look,
+      effect: this.effect,
       video: this.backdrop.live,
     };
   }
 
-  private cycleLook(direction: 1 | -1): void {
-    const i = LOOK_NAMES.indexOf(this.look);
-    this.look = LOOK_NAMES[(i + direction + LOOK_NAMES.length) % LOOK_NAMES.length];
+  private cycleEffect(direction: 1 | -1): void {
+    const choices = GLOBE_EFFECT_CHOICES;
+    const i = choices.indexOf(this.effect);
+    this.setEffect(choices[(i + direction + choices.length) % choices.length]);
     this.notifyControlsChanged();
+  }
+
+  /** Effects are built the first time they are chosen and cross-fade from then on. */
+  private setEffect(choice: EffectChoice): void {
+    this.effect = choice;
+    if (choice === 'none' || this.effects.has(choice)) return;
+    const parts: GlobeParts = {
+      turning: this.turning,
+      fixed: this.fixed,
+      dots: this.dots.material,
+      lines: this.lines.material,
+      shell: this.shell.material,
+      halo: this.halo.material,
+      resources: this.resources,
+      quality: this.ctx.quality,
+    };
+    const effect = timed(`globe:effect:${choice}`, () => GLOBE_EFFECTS[choice].create(parts));
+    const { main, accent } = GLOBE_COLOURS[this.colour];
+    effect.setColour?.(main, accent);
+    this.effects.set(choice, { effect, strength: 0 });
   }
 
   private applyColour(): void {
@@ -314,6 +372,7 @@ export class HoloGlobe extends BaseEnvironment {
     (this.lines.material.uniforms.uColor.value as Color).set(main);
     (this.shell.material.uniforms.uColor.value as Color).set(main);
     (this.halo.material.uniforms.uColor.value as Color).set(main);
+    for (const live of this.effects.values()) live.effect.setColour?.(main, accent);
   }
 
   private applyDrawCount(quality: QualityLevel): void {
@@ -337,6 +396,11 @@ export class HoloGlobe extends BaseEnvironment {
         // With the camera picture up the globe belongs to the hands in it; a mouse passing over
         // on its way to a button must not carry it off. The mouse can still spin and resize it.
         const stray = action.space === 'screen' && this.backdrop.live;
+        this.readTips(
+          action.hand,
+          action.phase === 'end' || stray ? undefined : action.tips,
+          action.space,
+        );
         if (action.phase === 'end' || stray) {
           this.state.setHand(action.hand, false);
           break;
@@ -379,10 +443,24 @@ export class HoloGlobe extends BaseEnvironment {
         if (action.phase === 'start') this.state.firePulse();
         break;
       case 'next':
-        if (action.phase === 'start') this.cycleLook(action.direction);
+        if (action.phase === 'start') this.cycleEffect(action.direction);
         break;
       default:
         break;
+    }
+  }
+
+  /** Remembers where a hand's fingertips are on screen, or that the hand has none to offer. */
+  private readTips(
+    hand: 0 | 1,
+    tips: ReadonlyArray<{ x: number; y: number }> | undefined,
+    space: 'image' | 'screen',
+  ): void {
+    for (let i = 0; i < 5; i++) {
+      const slot = hand * 5 + i;
+      const tip = tips?.[i];
+      this.tipsPresent[slot] = tip !== undefined;
+      if (tip) this.tipPoints[slot].copy(this.toScreen(space, tip.x, tip.y));
     }
   }
 
@@ -443,6 +521,33 @@ export class HoloGlobe extends BaseEnvironment {
     const halo = this.halo.material.uniforms;
     halo.uGlow.value = this.glow * (0.8 + 0.4 * state.held + state.collapse * 1.6);
     halo.uPulse.value = state.pulse;
+
+    this.updateEffects(dt, radius);
+  }
+
+  private updateEffects(dt: number, radius: number): void {
+    if (this.effects.size === 0) return;
+    for (let i = 0; i < TIP_COUNT; i++) {
+      if (!this.tipsPresent[i]) continue;
+      const point = this.tipPoints[i];
+      ndcToPlane(this.camera, point.x, point.y, ORIGIN, this.tips[i]).sub(this.globe.position);
+    }
+    for (const [name, live] of this.effects) {
+      const goal = name === this.effect ? 1 : 0;
+      if (goal === 0 && live.strength === 0) continue; // faded out and already told so
+      live.strength = damp(live.strength, goal, 5, dt);
+      if (goal === 0 && live.strength < 0.004) live.strength = 0;
+      if (goal === 1 && live.strength > 0.996) live.strength = 1;
+      live.effect.update({
+        dt,
+        time: this.time,
+        strength: live.strength,
+        state: this.state,
+        radius,
+        tips: this.tips,
+        tipsPresent: this.tipsPresent,
+      });
+    }
   }
 
   dispose(): void {

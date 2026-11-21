@@ -34,6 +34,11 @@ export function createGlobeDotsMaterial(maxPointSize: number): ShaderMaterial {
       uBoost: { value: 1 },
       uColor: { value: new Color() },
       uAccent: { value: new Color() },
+      uScan: { value: 0 },
+      uScanTime: { value: 0 },
+      uGlitch: { value: 0 },
+      uGlitchY: { value: 0 },
+      uFlicker: { value: 1 },
     },
   });
 }
@@ -47,6 +52,11 @@ export function createGlobeLinesMaterial(): ShaderMaterial {
       uColor: { value: new Color() },
       uOpacity: { value: 0.25 },
       uBoost: { value: 1 },
+      uScan: { value: 0 },
+      uScanTime: { value: 0 },
+      uGlitch: { value: 0 },
+      uGlitchY: { value: 0 },
+      uFlicker: { value: 1 },
     },
   });
 }
@@ -62,6 +72,11 @@ export function createGlobeShellMaterial(): ShaderMaterial {
       uRim: { value: 0.85 },
       uFill: { value: 0.035 },
       uBoost: { value: 1 },
+      uScan: { value: 0 },
+      uScanTime: { value: 0 },
+      uGlitch: { value: 0 },
+      uGlitchY: { value: 0 },
+      uFlicker: { value: 1 },
     },
   });
 }
