@@ -10,6 +10,11 @@ import { clearGestureState, syncGesturesToStore } from './gestureState';
 import { TrackingSession } from './TrackingSession';
 import type { SessionStatus } from './TrackingSession';
 
+export interface AppOptions {
+  /** Force multisampling on or off instead of letting the renderer choose. For measurement. */
+  antialias?: boolean;
+}
+
 /**
  * The composition root. Every system is created here and joined to its neighbours here;
  * no system reaches for another on its own. The UI drives the app through this class.
@@ -22,12 +27,12 @@ export class App {
   private readonly fallback: FallbackInput;
   private readonly cleanups: Array<() => void> = [];
 
-  constructor(canvas: HTMLCanvasElement) {
+  constructor(canvas: HTMLCanvasElement, options: AppOptions = {}) {
     const { settings } = store.getState();
 
-    this.engine = new Engine(canvas);
+    this.engine = new Engine(canvas, { antialias: options.antialias });
     registerEnvironments(this.engine);
-    this.engine.setQualityPreference(settings.quality);
+    this.engine.setQualityPreference(settings.quality, settings.adaptedQuality);
     this.engine.setParticleBudget(settings.particleCount);
 
     this.controller = new InteractionController(this.bus, DEFAULT_MAPPINGS);
@@ -45,6 +50,7 @@ export class App {
       syncGesturesToStore(this.bus),
       this.engine.events.on('fps', (fps) => store.setState({ fps })),
       this.engine.events.on('quality', (resolvedQuality) => store.setState({ resolvedQuality })),
+      this.engine.events.on('adapted', (adaptedQuality) => updateSettings({ adaptedQuality })),
       // Whatever environment is on screen is the one gestures act on.
       this.engine.events.on('environment', (environment) => {
         this.controller.setTarget(environment?.id ?? null, environment);
@@ -55,7 +61,11 @@ export class App {
       watch(
         (s) => s.settings,
         (next, previous) => {
-          if (next.quality !== previous.quality) this.engine.setQualityPreference(next.quality);
+          if (next.quality !== previous.quality) {
+            // Choosing a setting by hand is a fresh start: what auto had settled on is forgotten.
+            this.engine.setQualityPreference(next.quality);
+            if (next.adaptedQuality) updateSettings({ adaptedQuality: null });
+          }
           if (next.particleCount !== previous.particleCount) {
             this.engine.setParticleBudget(next.particleCount);
             const environment = this.environment;

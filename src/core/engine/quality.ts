@@ -43,8 +43,3 @@ export function guessQuality(hints: DeviceHints): QualityLevel {
   if (discrete && hints.cores >= 6) return 'high';
   return 'medium';
 }
-
-export function lowerQuality(level: QualityLevel): QualityLevel {
-  const i = QUALITY_ORDER.indexOf(level);
-  return QUALITY_ORDER[Math.max(0, i - 1)];
-}

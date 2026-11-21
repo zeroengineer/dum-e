@@ -4,6 +4,11 @@ import type { DeviceHints } from '../engine/quality';
 
 export const BACKGROUND_COLOR = 0x04060c;
 
+export interface RendererOptions {
+  /** Multisample the drawing buffer. Defaults to on only for displays below 1.5x density. */
+  antialias?: boolean;
+}
+
 /** What the last rendered frame cost the GPU to submit. */
 export interface RenderStats {
   drawCalls: number;
@@ -24,10 +29,19 @@ export class RendererManager {
   private readonly resizeObserver: ResizeObserver | null;
   private readonly resizeListeners = new Set<(aspect: number) => void>();
 
-  constructor(private readonly canvas: HTMLCanvasElement) {
+  /** Whether the drawing buffer is multisampled. Fixed for the life of the renderer. */
+  readonly antialias: boolean;
+
+  constructor(
+    private readonly canvas: HTMLCanvasElement,
+    options: RendererOptions = {},
+  ) {
+    // Multisampling roughly doubles the cost of a frame on a high-density display, where the
+    // extra pixels already smooth edges. Measured with scripts/measure-perf.mjs.
+    this.antialias = options.antialias ?? (window.devicePixelRatio || 1) < 1.5;
     this.renderer = new WebGLRenderer({
       canvas,
-      antialias: true,
+      antialias: this.antialias,
       alpha: false,
       powerPreference: 'high-performance',
       stencil: false,
@@ -76,6 +90,14 @@ export class RendererManager {
 
   render(scene: Scene, camera: Camera): void {
     if (!this.contextLost) this.renderer.render(scene, camera);
+  }
+
+  /**
+   * Blocks until the GPU has finished everything submitted so far. Only for measurement: timing
+   * a frame that ends with this includes the GPU's share, which is otherwise invisible.
+   */
+  finish(): void {
+    if (!this.contextLost) this.renderer.getContext().finish();
   }
 
   /** Counts for the most recent `render` call. */
