@@ -109,8 +109,16 @@ still looks smooth at 60 fps.
 - No post-processing passes. Glow is additive blending on soft point sprites, which costs nothing
   extra and runs on integrated GPUs.
 - Pixel ratio is capped by quality tier (1 / 1.5 / 2) and particle budgets scale with it. The tier
-  is guessed from device hints (GPU name, cores, memory), lowered automatically if the frame rate
-  stays under 38 fps for three seconds, and can be overridden in settings.
+  is guessed from device hints (GPU name, cores, memory) and can be fixed in settings.
+- In automatic mode `QualityGovernor` (`src/core/engine/QualityGovernor.ts`) adapts from measured
+  frame rate. Under 52 fps for 2.5 seconds it steps down, giving up pixel ratio a quarter at a
+  time before it gives up a tier. At 57 fps or more for 12 seconds it steps back up, never past
+  the starting guess; a climb that has to be undone is retried after 30 seconds, then 60, and so
+  on. If two steps down do not raise the frame rate, something else is setting the pace (a 30 Hz
+  display, a throttled tab): it undoes them and waits for the frame rate to change. The level it
+  settles on is saved with the settings and resumed on the next visit.
+- The drawing buffer is multisampled only on displays below 1.5x pixel density. On a 2x display
+  multisampling roughly doubled the cost of a frame and the extra pixels already smooth edges.
 - Geometries and materials are shared between like objects and tracked per environment; switching
   environments disposes everything the old one allocated.
 - One-Euro filtering smooths landmarks adaptively: heavy smoothing when the hand is still, almost

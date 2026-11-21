@@ -1,4 +1,5 @@
 import { createStore } from 'zustand/vanilla';
+import type { RenderQuality } from '../core/engine/QualityGovernor';
 import type { EnvironmentId, QualityLevel } from '../core/scene/Environment';
 import type { GestureHand, GestureName } from '../gestures/events/types';
 
@@ -22,6 +23,8 @@ export interface Settings {
   /** 0 means "use the quality default". */
   particleCount: number;
   quality: 'auto' | QualityLevel;
+  /** Where automatic quality last settled on this device, so the next visit starts there. */
+  adaptedQuality: RenderQuality | null;
   showPreview: boolean;
   /** Mouse and keyboard act as a virtual hand. */
   fallbackInput: boolean;
@@ -66,6 +69,7 @@ export const DEFAULT_SETTINGS: Settings = {
   trackingHz: 24,
   particleCount: 0,
   quality: 'auto',
+  adaptedQuality: null,
   showPreview: true,
   fallbackInput: true,
   tutorialSeen: false,
@@ -95,10 +99,19 @@ export function sanitizeSettings(s: Settings): Settings {
     trackingHz: num(s.trackingHz, 10, 30, DEFAULT_SETTINGS.trackingHz),
     particleCount: num(s.particleCount, 0, 120_000, 0),
     quality: qualities.includes(s.quality) ? s.quality : 'auto',
+    adaptedQuality: sanitizeAdapted(s.adaptedQuality),
     showPreview: s.showPreview !== false,
     fallbackInput: s.fallbackInput !== false,
     tutorialSeen: s.tutorialSeen === true,
   };
+}
+
+function sanitizeAdapted(value: unknown): RenderQuality | null {
+  if (typeof value !== 'object' || value === null) return null;
+  const { tier, pixelRatio } = value as Partial<RenderQuality>;
+  if (tier !== 'low' && tier !== 'medium' && tier !== 'high') return null;
+  if (typeof pixelRatio !== 'number' || !(pixelRatio >= 0.5 && pixelRatio <= 4)) return null;
+  return { tier, pixelRatio };
 }
 
 function saveSettings(settings: Settings): void {

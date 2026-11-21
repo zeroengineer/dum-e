@@ -25,6 +25,8 @@ export interface DumeTestHook {
   };
   /** The latest profiling readout, or null before the first one. */
   perf(): (PerfSample & { fps: number; detectMs: number | null }) | null;
+  /** Wait for the GPU every frame so `perf()` timings include it. Slows rendering; for measuring. */
+  gpuSync(on: boolean): void;
 }
 
 declare global {
@@ -64,6 +66,10 @@ export function installTestHook(app: App): DumeTestHook {
       actions.length = 0;
     },
     perf: () => (sample ? { ...sample, fps: store.getState().fps, detectMs } : null),
+    gpuSync: (on) => {
+      sample = null;
+      app.engine.setGpuSync(on);
+    },
     scene: () => {
       const environment = app.environment;
       const controls: Record<string, unknown> = {};

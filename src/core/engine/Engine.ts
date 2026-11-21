@@ -4,6 +4,7 @@ import { Emitter } from '../../utils/emitter';
 import { timed } from '../../utils/perf';
 import { SampleWindow } from '../../utils/stats';
 import { RendererManager } from '../renderer/RendererManager';
+import type { RendererOptions } from '../renderer/RendererManager';
 import type {
   Environment,
   EnvironmentContext,
@@ -12,7 +13,9 @@ import type {
   QualityLevel,
 } from '../scene/Environment';
 import { SceneManager } from '../scene/SceneManager';
-import { QUALITY_PROFILES, guessQuality, lowerQuality } from './quality';
+import { QUALITY_PROFILES, guessQuality } from './quality';
+import { QualityGovernor, startingQuality } from './QualityGovernor';
+import type { RenderQuality } from './QualityGovernor';
 
 /** A profiling readout, published about twice a second while profiling is on. */
 export interface PerfSample {
@@ -20,9 +23,14 @@ export interface PerfSample {
   frameP50: number;
   frameP95: number;
   frameMax: number;
-  /** Main-thread time spent updating and submitting a frame, in milliseconds. */
+  /**
+   * Main-thread time spent updating and submitting a frame, in milliseconds. With GPU sync on
+   * (a measuring mode) it also includes the time the GPU took to draw the frame.
+   */
   workMean: number;
   workP95: number;
+  gpuSync: boolean;
+  antialias: boolean;
   drawCalls: number;
   points: number;
   triangles: number;
@@ -36,13 +44,12 @@ interface EngineEvents {
   fps: number;
   perf: PerfSample;
   quality: QualityLevel;
+  /** Automatic quality moved to a new level. Worth remembering for the next visit. */
+  adapted: RenderQuality;
   environment: Environment | null;
 }
 
 const MAX_DT = 0.1;
-/** In auto mode, sustained frame rates below this lower the quality tier. */
-const LOW_FPS = 38;
-const LOW_FPS_SECONDS = 3;
 
 /**
  * The render loop. Owns the renderer, the active environment and quality adaptation.
@@ -62,21 +69,22 @@ export class Engine {
   private elapsed = 0;
   private frames = 0;
   private fpsWindowStart = 0;
-  private lowFpsSeconds = 0;
-  private qualityPreference: 'auto' | QualityLevel = 'auto';
+  /** Present only while quality is automatic. */
+  private governor: QualityGovernor | null = null;
   private quality: QualityLevel;
   private particleBudget = 0;
-  private adaptationPausedUntil = 0;
   private video: HTMLVideoElement | null = null;
   private profiling = false;
+  private gpuSync = false;
   /** About two seconds of frames at 60 fps. */
   private readonly frameTimes = new SampleWindow(120);
   private readonly workTimes = new SampleWindow(120);
 
-  constructor(canvas: HTMLCanvasElement) {
-    this.renderer = new RendererManager(canvas);
-    this.quality = guessQuality(this.renderer.hints);
-    this.renderer.setPixelRatioCap(QUALITY_PROFILES[this.quality].maxPixelRatio);
+  constructor(canvas: HTMLCanvasElement, options: RendererOptions = {}) {
+    this.renderer = new RendererManager(canvas, options);
+    const start = startingQuality(guessQuality(this.renderer.hints), devicePixelRatio());
+    this.quality = start.tier;
+    this.renderer.setPixelRatioCap(start.pixelRatio);
     this.backdrop = new Starfield(QUALITY_PROFILES.medium.backdropStars);
     this.backdropScene.add(this.backdrop.points);
     this.backdropCamera.aspect = this.renderer.aspect;
@@ -105,14 +113,26 @@ export class Engine {
     const environment = timed(`activate:${id ?? 'none'}`, () =>
       this.scenes.activate(id, this.context()),
     );
-    this.lowFpsSeconds = 0;
+    this.governor?.settle();
     this.events.emit('environment', environment);
     return environment;
   }
 
-  setQualityPreference(preference: 'auto' | QualityLevel): void {
-    this.qualityPreference = preference;
-    this.applyQuality(preference === 'auto' ? guessQuality(this.renderer.hints) : preference);
+  /**
+   * `auto` starts from a guess at what the device can do and adapts from measured frame rate;
+   * `remembered` resumes from the level an earlier visit adapted to. A named tier is fixed.
+   */
+  setQualityPreference(preference: 'auto' | QualityLevel, remembered?: RenderQuality | null): void {
+    if (preference !== 'auto') {
+      this.governor = null;
+      this.applyQuality(startingQuality(preference, devicePixelRatio()));
+      return;
+    }
+    this.governor = new QualityGovernor(
+      startingQuality(guessQuality(this.renderer.hints), devicePixelRatio()),
+    );
+    if (remembered) this.governor.restore(remembered);
+    this.applyQuality(this.governor.current);
   }
 
   /** 0 restores the per-quality default. */
@@ -132,13 +152,23 @@ export class Engine {
    * which say nothing about how fast the scene itself renders.
    */
   pauseQualityAdaptation(ms: number): void {
-    this.adaptationPausedUntil = performance.now() + ms;
-    this.lowFpsSeconds = 0;
+    this.governor?.pause(ms / 1000);
   }
 
   /** Collects frame timings and render counts and publishes them as `perf` events. */
   setProfiling(on: boolean): void {
     this.profiling = on;
+    if (!on) this.gpuSync = false;
+    this.frameTimes.clear();
+    this.workTimes.clear();
+  }
+
+  /**
+   * Measuring mode: wait for the GPU at the end of every frame so frame timings include its
+   * work. It slows rendering down and is never on in normal use.
+   */
+  setGpuSync(on: boolean): void {
+    this.gpuSync = on;
     this.frameTimes.clear();
     this.workTimes.clear();
   }
@@ -177,13 +207,12 @@ export class Engine {
     };
   }
 
-  private applyQuality(quality: QualityLevel): void {
-    const changed = quality !== this.quality;
-    this.quality = quality;
-    this.renderer.setPixelRatioCap(QUALITY_PROFILES[quality].maxPixelRatio);
-    this.scenes.current?.setQuality(quality, this.renderer.pixelRatio);
-    this.lowFpsSeconds = 0;
-    if (changed) this.events.emit('quality', quality);
+  private applyQuality(next: RenderQuality): void {
+    const changed = next.tier !== this.quality;
+    this.quality = next.tier;
+    this.renderer.setPixelRatioCap(next.pixelRatio);
+    this.scenes.current?.setQuality(next.tier, this.renderer.pixelRatio);
+    if (changed) this.events.emit('quality', next.tier);
   }
 
   private readonly frame = (now: number): void => {
@@ -204,6 +233,7 @@ export class Engine {
       this.renderer.render(this.backdropScene, this.backdropCamera);
     }
     if (this.profiling) {
+      if (this.gpuSync) this.renderer.finish();
       this.frameTimes.push(interval);
       this.workTimes.push(performance.now() - workStart);
     }
@@ -220,13 +250,11 @@ export class Engine {
     this.events.emit('fps', fps);
     if (this.profiling) this.emitPerf();
 
-    if (this.qualityPreference !== 'auto' || this.quality === 'low') return;
-    if (now < this.adaptationPausedUntil) {
-      this.lowFpsSeconds = 0;
-      return;
+    const adapted = this.governor?.sample(fps, span / 1000);
+    if (adapted) {
+      this.applyQuality(adapted);
+      this.events.emit('adapted', { ...adapted });
     }
-    this.lowFpsSeconds = fps < LOW_FPS ? this.lowFpsSeconds + span / 1000 : 0;
-    if (this.lowFpsSeconds >= LOW_FPS_SECONDS) this.applyQuality(lowerQuality(this.quality));
   }
 
   private emitPerf(): void {
@@ -239,6 +267,8 @@ export class Engine {
       ...this.renderer.stats(),
       pixelRatio: this.renderer.pixelRatio,
       quality: this.quality,
+      gpuSync: this.gpuSync,
+      antialias: this.renderer.antialias,
     });
   }
 
@@ -258,3 +288,5 @@ export class Engine {
     }
   };
 }
+
+const devicePixelRatio = (): number => window.devicePixelRatio || 1;

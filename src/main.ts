@@ -11,7 +11,9 @@ if (!canvas) throw new Error('Missing #stage canvas');
 const ui = document.querySelector<HTMLElement>('#ui');
 if (!ui) throw new Error('Missing #ui container');
 
-const app = new App(canvas);
+// ?aa=0 or ?aa=1 forces multisampling off or on, for comparing its cost.
+const aa = new URLSearchParams(location.search).get('aa');
+const app = new App(canvas, { antialias: aa === '0' ? false : aa === '1' ? true : undefined });
 mountUi(app, ui, { perfOverlay: perfOverlayRequested(location.search) });
 if (testHookRequested(location.search)) installTestHook(app);
 

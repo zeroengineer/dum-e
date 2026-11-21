@@ -110,5 +110,17 @@ Add `?perf=1` to the URL for a readout over the scene (`src/ui/components/PerfOv
 Wrap any new one-off heavy step in `timed('world:step', () => …)`. Scripts can read the same
 numbers with `window.__DUME__.perf()` when the page is opened with `?e2e=1`.
 
-A frame rate at the display's refresh rate only says the machine keeps up. Compare changes on a
-machine that does not, or compare main-thread time and stalls.
+A frame rate at the display's refresh rate only says the machine keeps up. To compare changes on
+a machine that does, take the refresh cap away:
+
+```bash
+npm run build
+node scripts/measure-perf.mjs                 # every world, 2x display, high quality
+node scripts/measure-perf.mjs --aa 1 --label "multisampling on"
+node scripts/measure-perf.mjs --dpr 1 --quality medium --worlds globe
+```
+
+It opens each world in Chromium on the real GPU with vsync off and waits for the GPU at the end
+of every frame (`window.__DUME__.gpuSync(true)`), so the frame time it prints is CPU and GPU
+together. 16.7 ms is the budget for 60 frames a second. Run it two or three times: readings move
+with whatever else the machine is doing. `?aa=0` and `?aa=1` force multisampling off and on.
