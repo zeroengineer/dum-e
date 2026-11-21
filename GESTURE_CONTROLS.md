@@ -127,6 +127,9 @@ Effects, one at a time, cross-fading when you change:
 - **Energy and plasma**: a churning skin of light over the globe. An open palm sends a ring of
   light down it, and arcs jump between its surface and any fingertip near it, so holding it
   between two open hands wraps it in lightning.
+- **Orbiting rings and data**: three tilted, dashed rings with satellites riding them, a bezel of
+  tick marks, and a readout of the latitude and longitude facing you and the globe's size. The
+  rings stand off further as the globe grows and draw in when it folds up.
 - **None**: the plain globe.
 
 The Controls panel sets look, effect, colour, size, spin speed, glow, how much the camera picture

@@ -4,12 +4,18 @@ import {
   globeArcsVertexShader,
   globeDotsFragmentShader,
   globeDotsVertexShader,
+  globeFlatFragmentShader,
+  globeFlatVertexShader,
   globeHaloFragmentShader,
   globeHaloVertexShader,
   globeLinesFragmentShader,
   globeLinesVertexShader,
   globePlasmaFragmentShader,
   globePlasmaVertexShader,
+  globeRingFragmentShader,
+  globeRingVertexShader,
+  globeSatelliteFragmentShader,
+  globeSatelliteVertexShader,
   globeShellFragmentShader,
   globeShellVertexShader,
 } from '../shaders/globe';
@@ -130,6 +136,54 @@ export function createGlobeArcsMaterial(tips: number): ShaderMaterial {
       uTips: { value: Array.from({ length: tips }, () => new Vector3()) },
       uTipOn: { value: new Array<number>(tips).fill(0) },
       uTime: { value: 0 },
+      uStrength: { value: 0 },
+      uColor: { value: new Color() },
+    },
+  });
+}
+
+export function createGlobeRingMaterial(
+  radius: number,
+  speed: number,
+  dashes: number,
+): ShaderMaterial {
+  return new ShaderMaterial({
+    ...LIGHT,
+    vertexShader: globeRingVertexShader,
+    fragmentShader: globeRingFragmentShader,
+    uniforms: {
+      uRadius: { value: radius },
+      uTime: { value: 0 },
+      uSpeed: { value: speed },
+      uDashes: { value: dashes },
+      uStrength: { value: 0 },
+      uColor: { value: new Color() },
+    },
+  });
+}
+
+export function createGlobeSatelliteMaterial(radius: number, speed: number): ShaderMaterial {
+  return new ShaderMaterial({
+    ...LIGHT,
+    vertexShader: globeSatelliteVertexShader,
+    fragmentShader: globeSatelliteFragmentShader,
+    uniforms: {
+      uRadius: { value: radius },
+      uTime: { value: 0 },
+      uSpeed: { value: speed },
+      uSize: { value: 8 },
+      uStrength: { value: 0 },
+      uColor: { value: new Color() },
+    },
+  });
+}
+
+export function createGlobeFlatMaterial(): ShaderMaterial {
+  return new ShaderMaterial({
+    ...LIGHT,
+    vertexShader: globeFlatVertexShader,
+    fragmentShader: globeFlatFragmentShader,
+    uniforms: {
       uStrength: { value: 0 },
       uColor: { value: new Color() },
     },

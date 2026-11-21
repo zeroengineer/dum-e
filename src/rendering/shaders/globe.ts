@@ -379,3 +379,81 @@ void main() {
   #include <colorspace_fragment>
 }
 `;
+
+/** A ring in its own flat plane; the vertices only carry their angle around it. */
+export const globeRingVertexShader = /* glsl */ `
+uniform float uRadius;
+attribute float aAngle;
+varying float vTurn;
+
+void main() {
+  vTurn = aAngle / 6.2831853;
+  vec3 p = vec3(cos(aAngle), 0.0, sin(aAngle)) * uRadius;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+}
+`;
+
+export const globeRingFragmentShader = /* glsl */ `
+uniform vec3 uColor;
+uniform float uTime;
+uniform float uSpeed;
+uniform float uDashes;
+uniform float uStrength;
+varying float vTurn;
+
+void main() {
+  // Dashes creep round the ring; a bright head with a fading tail laps it.
+  float dash = step(0.38, fract(vTurn * uDashes - uTime * uSpeed * 0.35));
+  float head = pow(fract(vTurn - uTime * uSpeed * 0.07), 7.0);
+  float strength = (0.34 * dash + head * 0.95) * uStrength;
+  gl_FragColor = vec4(uColor * (0.8 + head * 1.2), strength);
+  #include <colorspace_fragment>
+}
+`;
+
+/** Satellites ride a ring; each is only a starting place round it and derives the rest. */
+export const globeSatelliteVertexShader = /* glsl */ `
+uniform float uRadius;
+uniform float uTime;
+uniform float uSpeed;
+uniform float uSize;
+attribute float aPhase;
+
+void main() {
+  float pace = 0.6 + 0.8 * fract(aPhase * 7.31);
+  float angle = aPhase * 6.2831853 + uTime * uSpeed * pace;
+  vec3 p = vec3(cos(angle), 0.0, sin(angle)) * uRadius;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+  gl_PointSize = uSize * (0.6 + 0.7 * fract(aPhase * 3.17));
+}
+`;
+
+export const globeSatelliteFragmentShader = /* glsl */ `
+uniform vec3 uColor;
+uniform float uStrength;
+
+void main() {
+  float d = length(gl_PointCoord - 0.5) * 2.0;
+  if (d > 1.0) discard;
+  float core = 1.0 - d;
+  gl_FragColor = vec4(uColor * (0.7 + core), pow(core, 1.4) * uStrength);
+  #include <colorspace_fragment>
+}
+`;
+
+/** Plain lines of one colour, for tick marks and leader lines. */
+export const globeFlatVertexShader = /* glsl */ `
+void main() {
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}
+`;
+
+export const globeFlatFragmentShader = /* glsl */ `
+uniform vec3 uColor;
+uniform float uStrength;
+
+void main() {
+  gl_FragColor = vec4(uColor, uStrength);
+  #include <colorspace_fragment>
+}
+`;

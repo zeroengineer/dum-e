@@ -1,4 +1,4 @@
-import type { Group, ShaderMaterial, Vector3 } from 'three';
+import type { Group, Quaternion, ShaderMaterial, Vector3 } from 'three';
 import type { ResourceTracker } from '../../../core/resources/ResourceTracker';
 import type { QualityLevel } from '../../../core/scene/Environment';
 import type { GlobeState } from '../globeState';
@@ -30,6 +30,8 @@ export interface GlobeFrame {
   state: Readonly<GlobeState>;
   /** The globe's radius in scene units. */
   radius: number;
+  /** How the globe is turned. */
+  orientation: Readonly<Quaternion>;
   /**
    * Fingertips in scene units relative to the globe's centre: ten entries, thumb to little
    * finger for the left hand slot, then the same for the right.
